@@ -1,18 +1,6 @@
 # context.area: VIEW_3D
 
-# add-on skeleton taken from: https://blender.stackexchange.com/a/57332
-
-bl_info = {
-    "name" : "range_scanner",
-    "author" : "Lorenzo Neumann",
-    "description" : "Range scanner simulation for Blender",
-    "blender" : (2, 81, 0),
-    "version" : (0, 0, 1),
-    "location" : "3D View > Scanner",
-    "warning" : "",
-    "category" : "3D View",
-    "wiki_url": "https://git.informatik.tu-freiberg.de/masterarbeit/blender-range-scanner",
-}
+# Range Scanner Extension for Blender 5.0+
 
 import bpy
 from bpy import context
@@ -50,6 +38,7 @@ from mathutils import Vector, Euler
 from math import radians
 
 import numpy as np
+import yaml
 
 # define location of UI panels
 class MAIN_PANEL:
@@ -57,112 +46,6 @@ class MAIN_PANEL:
     bl_region_type = "UI"
     bl_category = "Scanner"
 
-
-
-
-############################################################# 
-#                                                           #
-#                 DEPENDENCY MANAGEMENT                     #
-#                                                           #
-#############################################################
-
-
-# source: https://github.com/robertguetzkow/blender-python-examples/tree/master/add-ons/install-dependencies
-
-#    Copyright (C) 2020  Robert Guetzkow
-#
-#    This program is free software: you can redistribute it and/or modify
-#    it under the terms of the GNU General Public License as published by
-#    the Free Software Foundation, either version 3 of the License, or
-#    (at your option) any later version.
-#
-#    This program is distributed in the hope that it will be useful,
-#    but WITHOUT ANY WARRANTY; without even the implied warranty of
-#    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#    GNU General Public License for more details.
-#
-#    You should have received a copy of the GNU General Public License
-#    along with this program.  If not, see <https://www.gnu.org/licenses/>
-
-
-import bpy
-import subprocess
-from collections import namedtuple
-
-def import_module(module_name, global_name=None):
-    """
-    Import a module.
-    :param module_name: Module to import.
-    :param global_name: (Optional) Name under which the module is imported. If None the module_name will be used.
-       This allows to import under a different name with the same effect as e.g. "import numpy as np" where "np" is
-       the global_name under which the module can be accessed.
-    :raises: ImportError and ModuleNotFoundError
-    """
-
-    if global_name is None:
-        global_name = module_name
-
-    # Attempt to import the module and assign it to globals dictionary. This allow to access the module under
-    # the given name, just like the regular import would.
-    globals()[global_name] = importlib.import_module(module_name)
-
-
-def install_pip():
-    """
-    Installs pip if not already present. Please note that ensurepip.bootstrap() also calls pip, which adds the
-    environment variable PIP_REQ_TRACKER. After ensurepip.bootstrap() finishes execution, the directory doesn't exist
-    anymore. However, when subprocess is used to call pip, in order to install a package, the environment variables
-    still contain PIP_REQ_TRACKER with the now nonexistent path. This is a problem since pip checks if PIP_REQ_TRACKER
-    is set and if it is, attempts to use it as temp directory. This would result in an error because the
-    directory can't be found. Therefore, PIP_REQ_TRACKER needs to be removed from environment variables.
-    :return:
-    """
-
-    try:
-        # Check if pip is already installed
-        subprocess.run([sys.executable, "-m", "pip", "--version"], check=True)
-    except subprocess.CalledProcessError:
-        import ensurepip
-
-        ensurepip.bootstrap()
-        os.environ.pop("PIP_REQ_TRACKER", None)
-
-
-def install_and_import_module(module, importName):
-    """
-    Installs the package through pip and attempts to import the installed module.
-    :param module_name: Module to import.
-    :param package_name: (Optional) Name of the package that needs to be installed. If None it is assumed to be equal
-       to the module_name.
-    :param global_name: (Optional) Name under which the module is imported. If None the module_name will be used.
-       This allows to import under a different name with the same effect as e.g. "import numpy as np" where "np" is
-       the global_name under which the module can be accessed.
-    :raises: subprocess.CalledProcessError and ImportError
-    """
-
-    # Blender disables the loading of user site-packages by default. However, pip will still check them to determine
-    # if a dependency is already installed. This can cause problems if the packages is installed in the user
-    # site-packages and pip deems the requirement satisfied, but Blender cannot import the package from the user
-    # site-packages. Hence, the environment variable PYTHONNOUSERSITE is set to disallow pip from checking the user
-    # site-packages. If the package is not already installed for Blender's Python interpreter, it will then try to.
-    # The paths used by pip can be checked with `subprocess.run([sys.executable, "-m", "site"], check=True)`
-
-    # Store the original environment variables
-    environ_orig = dict(os.environ)
-    os.environ["PYTHONNOUSERSITE"] = "1"
-
-    try:
-        print(f"Installing {module}")
-
-        # Try to install the package. This may fail with subprocess.CalledProcessError
-        subprocess.run([sys.executable, "-m", "pip", "install", module], check=True)
-    finally:
-        # Always restore the original environment variables
-        os.environ.clear()
-        os.environ.update(environ_orig)
-
-    # The installation succeeded, attempt to import the module again
-    import_module(importName)
 
 
 
@@ -2276,8 +2159,6 @@ def register():
 
     with open(configPath, 'r') as stream:
         try:
-            # we can't load it before checking for our dependencies, as we need the yaml module here
-            import yaml
             config = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)

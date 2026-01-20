@@ -36,62 +36,56 @@ def getTargetMaterials(debugOutput, target):
         material = target.material_slots[materialIndex].material
 
         if material is not None:
-            if material.use_nodes == False:
-                # diffuse_color, metallic, specular_intensity, roughness
-                rgba = material.diffuse_color
-                metallic = material.metallic
-
-                targetMaterials[materialIndex] = MaterialProperty(rgba, None, metallic, 0.0)
+            # Blender 4.0+ always uses nodes for materials
+            # Get the Material Output node and look at the connected nodes
+            # see: https://blender.stackexchange.com/a/5471/95167
+            if material.node_tree is None:
+                if debugOutput:
+                    print(f"WARNING: Material '{material.name}' has no node tree!")
                 continue
-            else:
-                # the easy way would be to get the active node:
-                # node = material.node_tree.nodes.active
-                # the problem here is that also no node can be active so this returns None
 
-                # instead, we get the Material Output node and look at the connected nodes
-                # see: https://blender.stackexchange.com/a/5471/95167
-                links = material.node_tree.nodes["Material Output"].inputs["Surface"].links
-   
-                if len(links) == 0:
-                    raise ValueError(f"ERROR: Material with name '{material.name}' does not have any links! "
-                                     "Please remove the material or check that the 'Material Output'-node of this material is properly connected. ")
+            links = material.node_tree.nodes["Material Output"].inputs["Surface"].links
 
-                for link in links:
-                    # get the node of the connected link
-                    node = link.from_node
+            if len(links) == 0:
+                raise ValueError(f"ERROR: Material with name '{material.name}' does not have any links! "
+                                 "Please remove the material or check that the 'Material Output'-node of this material is properly connected. ")
 
-                    # node tree
-                    if node.type == 'BSDF_GLASS':
-                        # glass
-                        rgba = node.inputs['Color'].default_value
-                        ior = node.inputs['IOR'].default_value
+            for link in links:
+                # get the node of the connected link
+                node = link.from_node
 
-                        targetMaterials[materialIndex] = MaterialProperty(rgba, None, 0.0, ior)
-                        continue
-                    elif node.type == 'BSDF_PRINCIPLED':
-                        # check if an image texture is connected to the BSDF node
-                        connectedLinks = node.inputs['Base Color'].links
-                        if len(connectedLinks) > 0 and connectedLinks[0].from_node.type == "TEX_IMAGE":
-                            # image texture
-                            image = connectedLinks[0].from_node.image
-                            texture = Image(np.asarray(image.pixels), image.size)
+                # node tree
+                if node.type == 'BSDF_GLASS':
+                    # glass
+                    rgba = node.inputs['Color'].default_value
+                    ior = node.inputs['IOR'].default_value
 
-                            # retrieve metallic factor
-                            metallic = node.inputs['Metallic'].default_value
+                    targetMaterials[materialIndex] = MaterialProperty(rgba, None, 0.0, ior)
+                    continue
+                elif node.type == 'BSDF_PRINCIPLED':
+                    # check if an image texture is connected to the BSDF node
+                    connectedLinks = node.inputs['Base Color'].links
+                    if len(connectedLinks) > 0 and connectedLinks[0].from_node.type == "TEX_IMAGE":
+                        # image texture
+                        image = connectedLinks[0].from_node.image
+                        texture = Image(np.asarray(image.pixels), image.size)
 
-                            targetMaterials[materialIndex] = MaterialProperty(None, texture, metallic, 0.0)
-                            continue
-
-                        # no texture, just a simple color
-                        rgba = node.inputs['Base Color'].default_value
+                        # retrieve metallic factor
                         metallic = node.inputs['Metallic'].default_value
-        
-                        targetMaterials[materialIndex] = MaterialProperty(rgba, None, metallic, 0.0)
+
+                        targetMaterials[materialIndex] = MaterialProperty(None, texture, metallic, 0.0)
                         continue
-                    else:
-                        # unknown material
-                        print("Unknown material type for object %s!" % target.name)
-                        print(node.type)
+
+                    # no texture, just a simple color
+                    rgba = node.inputs['Base Color'].default_value
+                    metallic = node.inputs['Metallic'].default_value
+
+                    targetMaterials[materialIndex] = MaterialProperty(rgba, None, metallic, 0.0)
+                    continue
+                else:
+                    # unknown material
+                    print("Unknown material type for object %s!" % target.name)
+                    print(node.type)
         else:
             # no material set
             if debugOutput:

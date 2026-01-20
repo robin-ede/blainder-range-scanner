@@ -1,4 +1,6 @@
-# Range scanner simulation for Blender
+# Range Scanner Simulation for Blender
+
+> **Fork Notice:** This is a fork of [BLAINDER](https://github.com/ln-12/blainder-range-scanner) by Lorenzo Neumann, updated for Blender 5.0 as part of a capstone project at Texas A&M University.
 
 This Blender add-on enables you to simulate lidar, sonar and time of flight scanners in your scene. Each point of the generated point cloud is labeled with the object or part id that was set before the simulation. The obtained data can be exported in various formats to use it in machnie learning tasks (see [Examples](#examples) section).
 
@@ -60,38 +62,64 @@ Supported formats:
 
 ## Installation
 
-This addon was tested with Blender 3.3 LTS ([see here](https://github.com/ln-12/blainder-range-scanner/tree/blender_3.3_lts)) and Blender 4.2 LTS ([see here](https://github.com/ln-12/blainder-range-scanner/tree/blender_4.2_lts)). 
+This addon supports multiple Blender versions:
+- **Blender 5.0+** (main branch) - Uses the new extension format
+- **Blender 4.2 LTS** ([see here](https://github.com/ln-12/blainder-range-scanner/tree/blender_4.2_lts))
+- **Blender 3.3 LTS** ([see here](https://github.com/ln-12/blainder-range-scanner/tree/blender_3.3_lts))
 
-The following steps are described for the portable version of Blender.
+### Blender 5.0+ Installation
 
-### Add the addon to Blender
+#### Step 1: Install Dependencies
 
-1. Clone the repository. This might take some time as the examples are quite large.
-2. Zip the `range_scanner` folder.
-3. Inside Blender, go to `Edit` -> `Preferences...` -> `Add-ons` -> click the top right `v` menu -> `Install from disk...` and select the `.zip` file.
+Install the required Python packages into Blender's Python environment.
 
-### Installing the dependencies needed to run the addon 
-
-Place the unzipped Blender and BlAInder directories in the same folder. Then open a terminal and navigate to that same folder (when running the command `ls` you should see `blainder-range-scanner` and `blender-4.2.5-<platform>-x64`).
-
-Linux:
-```
-$ ./blender-4.2.5-linux-x64/4.2/python/bin/python3.11 -m pip install -r ./blainder-range-scanner/range_scanner/requirements.txt
+**macOS:**
+```bash
+/Applications/Blender.app/Contents/Resources/5.0/python/bin/python3.11 -m pip install PyYAML laspy h5py pypng pascal-voc-writer numpy
 ```
 
-Windows (as administrator):
-``` 
-$ .\blender-4.2.5-windows-x64\4.2\python\bin\python.exe -m pip install -r .\blainder-range-scanner\range_scanner\requirements.txt
+**Linux:**
+```bash
+/path/to/blender-5.0/5.0/python/bin/python3.11 -m pip install PyYAML laspy h5py pypng pascal-voc-writer numpy
 ```
+
+**Windows (as administrator):**
+```powershell
+& "C:\Program Files\Blender Foundation\Blender 5.0\5.0\python\bin\python.exe" -m pip install PyYAML laspy h5py pypng pascal-voc-writer numpy
+```
+
+#### Step 2: Build the Extension
+
+```bash
+blender --command extension build --source-dir range_scanner --output-dir .
+```
+
+This creates a `range_scanner-1.0.0.zip` file.
+
+#### Step 3: Install the Extension
+
+In Blender:
+1. Go to `Edit` → `Preferences` → `Get Extensions`
+2. Click the dropdown arrow (top right) → `Install from Disk...`
+3. Select the `range_scanner-1.0.0.zip` file
+4. Enable the extension
+
+### Blender 4.2 and Earlier
+
+For older Blender versions, see the respective branches linked above. The installation process uses the legacy add-on format with `bl_info`.
 
 <br /><br />
 
 ## Dependencies
-To use this add-on, you need to install 
-* [laspy](https://github.com/laspy/laspy)
-* [h5py](https://github.com/h5py/h5py)
-* [pascal_voc_writer](https://github.com/AndrewCarterUK/pascal-voc-writer)
-* [pypng](https://github.com/drj11/pypng)
+
+The following Python packages are required (install via pip as shown in [Installation](#installation)):
+
+* [PyYAML](https://github.com/yaml/pyyaml) - Configuration file loading
+* [numpy](https://github.com/numpy/numpy) - Numerical operations
+* [laspy](https://github.com/laspy/laspy) - LAS file export
+* [h5py](https://github.com/h5py/h5py) - HDF5 file export
+* [pascal_voc_writer](https://github.com/AndrewCarterUK/pascal-voc-writer) - Pascal VOC XML export
+* [pypng](https://github.com/drj11/pypng) - PNG image export
 
 <br /><br />
 
@@ -100,8 +128,6 @@ To use this add-on, you need to install
 In Blenders 3D View, open the sidebar on the right (click on the little `<`) and select `Scanner`.
 
 ![alt text](images/open_sidebar.png)
-
-If necessary, install the required dependencies (see [Automatic installation](#automatic-installation)).
 
 Please note that not all of the following options are available for all scanner types.
 
@@ -456,17 +482,30 @@ Feel free to fork, modify and improve our work! We would also appreciate to rece
 
 ## About
 
-This add-on was developed by Lorenzo Neumann at [TU Bergakademie Freiberg](https://tu-freiberg.de/fakult1/inf).
+### Original Project
+
+This add-on was originally developed by Lorenzo Neumann at [TU Bergakademie Freiberg](https://tu-freiberg.de/fakult1/inf).
 
 Master thesis: *Lorenzo Neumann. "Generation of 3D training data for AI applications by simulation of ranging methods in virtual environments", 2020*.
 
 Paper: Reitmann, S.; Neumann, L.; Jung, B. BLAINDER—A Blender AI Add-On for Generation of Semantically Labeled Depth-Sensing Data. Sensors 2021, 21, 2144. https://doi.org/10.3390/s21062144
 
+### This Fork
+
+Updated for Blender 5.0 by Robin Ede at [Texas A&M University](https://www.tamu.edu/) as part of a capstone group project.
+
+Changes in this fork:
+- Migrated from legacy `bl_info` addon format to Blender 5.0 extension format (`blender_manifest.toml`)
+- Removed deprecated material API calls (`material.diffuse_color`, `material.metallic`)
+- Simplified version checks for Blender 5.0+ compatibility
+- Updated installation process for the new extension system
+
 <br /><br />
 
 ## License
 
-Copyright (C) 2024 Lorenzo Neumann
+Copyright (C) 2020-2024 Lorenzo Neumann (original)
+Copyright (C) 2026 Robin Ede (Blender 5.0 updates)
 
 This program is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
 

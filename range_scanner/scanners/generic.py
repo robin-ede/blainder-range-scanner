@@ -219,8 +219,6 @@ def startScan(context, properties, objectName):
     targets = []
     materialMappings = {}
 
-    version = bpy.app.version
-
     for target in allTargets:
         # we need to know which material belongs to which face, get the mapping for each target
         if len(target.material_slots) == 0:
@@ -234,11 +232,8 @@ def startScan(context, properties, objectName):
         context.view_layer.objects.active = target
 
         for modifier in target.modifiers:
-            # apply_as was removed, see https://blender.stackexchange.com/a/187711/95167
-            if version >= (2, 91, 0):
-                bpy.ops.object.modifier_apply(modifier=modifier.name)    
-            else:
-                bpy.ops.object.modifier_apply(apply_as='DATA', modifier=modifier.name)
+            # Blender 5.0+ uses the simplified modifier_apply API
+            bpy.ops.object.modifier_apply(modifier=modifier.name)
 
         try:
             targetMaterials = material_helper.getTargetMaterials(properties.debugOutput, target)
