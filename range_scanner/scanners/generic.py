@@ -14,7 +14,36 @@ from . import lidar
 from . import sonar
 from ..export import exporter
 from .. import material_helper
-from ..scanners import generic
+
+SWAPPABLE_PROPERTIES = [
+    'fovX', 'fovY', 'xStepDegree', 'yStepDegree', 'rotationsPerSecond',
+    'resolutionX', 'resolutionY', 'resolutionPercentage',
+    'fovSonar', 'sonarStepDegree', 'sonarMode3D', 'sonarKeepRotation',
+    'sourceLevel', 'noiseLevel', 'directivityIndex', 'processingGain',
+    'receptionThreshold', 'maxDistance', 'simulateWaterProfile', 'surfaceHeight',
+    'reflectivityLower', 'distanceLower', 'reflectivityUpper', 'distanceUpper', 'maxReflectionDepth',
+    'addNoise', 'mu', 'sigma', 'noiseType', 'noiseAbsoluteOffset', 'noiseRelativeOffset',
+    'simulateRain', 'rainfallRate', 'simulateDust', 'particleRadius', 'particlesPcm', 'dustCloudStart', 'dustCloudLength'
+]
+
+class TemporaryPropertyOverride:
+    def __init__(self, properties, property_names, suffix='2'):
+        self.properties = properties
+        self.property_names = property_names
+        self.suffix = suffix
+        self.original_values = {}
+
+    def __enter__(self):
+        for prop in self.property_names:
+            secondary_prop = prop + self.suffix
+            if hasattr(self.properties, prop) and hasattr(self.properties, secondary_prop):
+                self.original_values[prop] = getattr(self.properties, prop)
+                setattr(self.properties, prop, getattr(self.properties, secondary_prop))
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        for prop, value in self.original_values.items():
+            setattr(self.properties, prop, value)
 
 # source: https://blender.stackexchange.com/a/30739/95167
 def updateProgress(job_title, progress):
@@ -520,35 +549,15 @@ def performMultiSensorScan(context, properties):
     properties.scannerObject = properties.scannerObject2
     properties.scannerType = secondaryType
 
-    # Store primary settings and swap to secondary settings
-    primary_settings = {}
-    secondary_props = [
-        'fovX', 'fovY', 'xStepDegree', 'yStepDegree', 'rotationsPerSecond',
-        'resolutionX', 'resolutionY', 'resolutionPercentage',
-        'fovSonar', 'sonarStepDegree', 'sonarMode3D', 'sonarKeepRotation',
-        'sourceLevel', 'noiseLevel', 'directivityIndex', 'processingGain',
-        'receptionThreshold', 'maxDistance', 'simulateWaterProfile', 'surfaceHeight',
-        'reflectivityLower', 'distanceLower', 'reflectivityUpper', 'distanceUpper', 'maxReflectionDepth',
-        'addNoise', 'mu', 'sigma', 'noiseType', 'noiseAbsoluteOffset', 'noiseRelativeOffset',
-        'simulateRain', 'rainfallRate', 'simulateDust', 'particleRadius', 'particlesPcm', 'dustCloudStart', 'dustCloudLength'
-    ]
-    for prop in secondary_props:
-        if hasattr(properties, prop) and hasattr(properties, prop + '2'):
-            primary_settings[prop] = getattr(properties, prop)
-            setattr(properties, prop, getattr(properties, prop + '2'))
-
-    if secondaryType == ScannerType.sideScan.name:
-        secondaryHits = runSonarScan(context, properties, targets, materialMappings, categoryIDs, partIDs)
-        for hit in secondaryHits: hit.sensor_id = "sonar"
-    else:
-        secondaryHits = runLidarScan(context, properties, targets, materialMappings, categoryIDs, partIDs)
-        for hit in secondaryHits: hit.sensor_id = "lidar"
-    allHits.extend(secondaryHits)
-    print(f"Secondary scan complete: {len(secondaryHits)} hits")
-
-    # Restore primary settings
-    for prop, value in primary_settings.items():
-        setattr(properties, prop, value)
+    with TemporaryPropertyOverride(properties, SWAPPABLE_PROPERTIES, '2'):
+        if secondaryType == ScannerType.sideScan.name:
+            secondaryHits = runSonarScan(context, properties, targets, materialMappings, categoryIDs, partIDs)
+            for hit in secondaryHits: hit.sensor_id = "sonar"
+        else:
+            secondaryHits = runLidarScan(context, properties, targets, materialMappings, categoryIDs, partIDs)
+            for hit in secondaryHits: hit.sensor_id = "lidar"
+        allHits.extend(secondaryHits)
+        print(f"Secondary scan complete: {len(secondaryHits)} hits")
 
     # Restore original settings
     properties.scannerObject = originalScannerObject

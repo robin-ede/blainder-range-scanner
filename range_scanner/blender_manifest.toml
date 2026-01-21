@@ -1,7 +1,7 @@
 schema_version = "1.0.0"
 
 id = "range_scanner"
-version = "1.2.3"
+version = "1.2.4"
 name = "Range Scanner"
 tagline = "Simulate LiDAR, Sonar, and ToF range scanners"
 maintainer = "Robin Ede <robin_ede@tamu.edu>"

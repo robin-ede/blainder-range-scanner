@@ -1,4 +1,10 @@
 class HitInfo:
+    __slots__ = (
+        'location', 'faceNormal', 'faceIndex', 'distance', 'target',
+        'color', 'intensity', 'noiseLocation', 'noiseDistance',
+        'wasReflected', 'x', 'y', 'partID', 'categoryID', 'sensor_id'
+    )
+
     def __init__(self, location, faceNormal, faceIndex, distance, target):
         self.location = location
         self.faceNormal = faceNormal

@@ -21,10 +21,13 @@ class Exporter:
         self.height = height
 
         # map data tuples to arrays
+        # map data tuples to lists first (much faster than creating many small numpy arrays)
         if exportNoiseData:
-            self.mappedData = np.array(list(map(lambda hit: self.tupleToArrayWithNoise(hit), data))).transpose()
+            data_list = [self.tupleToArrayWithNoise(hit) for hit in data]
         else:
-            self.mappedData = np.array(list(map(lambda hit: self.tupleToArray(hit), data))).transpose()
+            data_list = [self.tupleToArray(hit) for hit in data]
+            
+        self.mappedData = np.array(data_list).transpose()
 
         print(f"Exporter initialized with {len(data)} hits.")
         if len(data) > 0:
@@ -32,16 +35,16 @@ class Exporter:
             print(f"Unique sensors in data: {unique_sensors}")
 
     def tupleToArray(self, hit):
-        return np.array([
+        return [
             hit.categoryID, hit.partID,                                             # 0, 1   
             hit.location.x, hit.location.y, hit.location.z,                         # 2, 3, 4
             hit.distance,                                                           # 5
             hit.intensity,                                                          # 6
             hit.color[0], hit.color[1], hit.color[2],                               # 7, 8, 9
-        ])
+        ]
 
     def tupleToArrayWithNoise(self, hit):
-        return np.array([
+        return [
             hit.categoryID, hit.partID,                                             # 0, 1
             hit.location.x, hit.location.y, hit.location.z,                         # 2, 3, 4
             hit.distance,                                                           # 5
@@ -49,7 +52,7 @@ class Exporter:
             hit.color[0], hit.color[1], hit.color[2],                               # 7, 8, 9
             hit.noiseLocation.x, hit.noiseLocation.y, hit.noiseLocation.z,          # 10, 11, 12
             hit.noiseDistance                                                       # 13
-        ])
+        ]
 
 
     def exportLAS(self):  
