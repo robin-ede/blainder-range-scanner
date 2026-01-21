@@ -15,6 +15,7 @@ __pycache__/
 *.ply
 *.csv
 *.png
+output*/
 *.xml
 
 *.zip

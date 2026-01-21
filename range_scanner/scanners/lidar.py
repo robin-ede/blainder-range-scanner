@@ -566,6 +566,9 @@ def performScan(context,
                     closestHit.noiseLocation = noiseLocation
                     closestHit.noiseDistance = noiseDistance
 
+                # set sensor identification
+                closestHit.sensor_id = "lidar"
+
                 # save closest hit into array
                 scannedValues[valueIndex] = closestHit
                 valueIndex += 1

@@ -18,3 +18,6 @@ class HitInfo:
 
         self.partID = None
         self.categoryID = None
+
+        # Sensor identification for multi-sensor fusion
+        self.sensor_id = ""

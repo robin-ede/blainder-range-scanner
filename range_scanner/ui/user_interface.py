@@ -61,7 +61,7 @@ class MAIN_PANEL:
 class WM_OT_LOAD_PRESET(Operator):
     bl_label = "Load preset"
     bl_idname = "wm.load_preset"
-    bl_description = "Loads all values for the selected scanner type"
+    bl_description = "Loads all values for the selected scanner type into the active scanner"
 
     @classmethod
     def poll(self, context):
@@ -71,7 +71,12 @@ class WM_OT_LOAD_PRESET(Operator):
         scene = context.scene
         properties = scene.scannerProperties
 
-        print("Loading preset for %s..." % properties.scannerName)
+        # Determine which scanner to load preset into based on active selection
+        is_primary = properties.activeScanner == 'primary'
+        suffix = "" if is_primary else "2"
+        scanner_label = "Primary" if is_primary else "Secondary"
+
+        print(f"Loading preset for {properties.scannerName} into {scanner_label} scanner...")
 
         for preset in config:
             if preset["name"] != properties.scannerName:
@@ -80,13 +85,12 @@ class WM_OT_LOAD_PRESET(Operator):
             scannerMode = preset["type"]
 
             if scannerMode == generic.ScannerType.rotating.name:
-                for key, value in preset.items(): 
+                for key, value in preset.items():
                     if key == "name" or key == "description" or key == "category":
-                        # we don't need the name, description, ...
                         continue
 
                     if key == "type":
-                        properties.scannerType = value
+                        setattr(properties, "scannerType" + suffix, value)
                     elif key == "reflectivityLower":
                         properties.reflectivityLower = value
                     elif key == "distanceLower":
@@ -96,26 +100,25 @@ class WM_OT_LOAD_PRESET(Operator):
                     elif key == "distanceUpper":
                         properties.distanceUpper = value
                     elif key == "fovX":
-                        properties.fovX = value
+                        setattr(properties, "fovX" + suffix, value)
                     elif key == "xStepDegree":
-                        properties.xStepDegree = value
+                        setattr(properties, "xStepDegree" + suffix, value)
                     elif key == "fovY":
-                        properties.fovY = value
+                        setattr(properties, "fovY" + suffix, value)
                     elif key == "yStepDegree":
-                        properties.yStepDegree = value
+                        setattr(properties, "yStepDegree" + suffix, value)
                     elif key == "rotationsPerSecond":
-                        properties.rotationsPerSecond = value
+                        setattr(properties, "rotationsPerSecond" + suffix, value)
                     else:
                         print("Invalid key: %s" % key)
 
             elif scannerMode == generic.ScannerType.static.name:
-                for key, value in preset.items(): 
+                for key, value in preset.items():
                     if key == "name" or key == "description" or key == "category":
-                        # we don't need the name, description, ...
                         continue
 
                     if key == "type":
-                        properties.scannerType = value
+                        setattr(properties, "scannerType" + suffix, value)
                     elif key == "reflectivityLower":
                         properties.reflectivityLower = value
                     elif key == "distanceLower":
@@ -125,26 +128,25 @@ class WM_OT_LOAD_PRESET(Operator):
                     elif key == "distanceUpper":
                         properties.distanceUpper = value
                     elif key == "resolutionX":
-                        properties.resolutionX = value
+                        setattr(properties, "resolutionX" + suffix, value)
                     elif key == "fovX":
-                        properties.fovX = value
+                        setattr(properties, "fovX" + suffix, value)
                     elif key == "resolutionY":
-                        properties.resolutionY = value
+                        setattr(properties, "resolutionY" + suffix, value)
                     elif key == "fovY":
-                        properties.fovY = value
+                        setattr(properties, "fovY" + suffix, value)
                     elif key == "resolutionPercentage":
-                        properties.resolutionPercentage = value
+                        setattr(properties, "resolutionPercentage" + suffix, value)
                     else:
                         print("Invalid key: %s" % key)
-            
+
             elif scannerMode == generic.ScannerType.sideScan.name:
-                for key, value in preset.items(): 
+                for key, value in preset.items():
                     if key == "name" or key == "description" or key == "category":
-                        # we don't need the name, description, ...
                         continue
 
                     if key == "type":
-                        properties.scannerType = value
+                        setattr(properties, "scannerType" + suffix, value)
                     elif key == "reflectivityLower":
                         properties.reflectivityLower = value
                     elif key == "distanceLower":
@@ -153,11 +155,11 @@ class WM_OT_LOAD_PRESET(Operator):
                         properties.reflectivityUpper = value
                     elif key == "distanceUpper":
                         properties.distanceUpper = value
-                        properties.fovX = value
+                        setattr(properties, "fovX" + suffix, value)
                     elif key == "resolution":
-                        properties.sonarStepDegree = value
+                        setattr(properties, "sonarStepDegree" + suffix, value)
                     elif key == "fovDown":
-                        properties.fovSonar = value
+                        setattr(properties, "fovSonar" + suffix, value)
                     elif key == "waterProfile":
                         # remove all entries
                         scene.custom.clear()
@@ -239,8 +241,16 @@ def scannerObjectPoll(self, object):
 class ScannerProperties(PropertyGroup):
     # GENERAL
     scannerObject: PointerProperty(
-        name="", 
+        name="",
         description="Select object which should be used as scanner",
+        type=bpy.types.Object,
+        poll=scannerObjectPoll
+    )
+
+    # Second scanner for multi-sensor fusion
+    scannerObject2: PointerProperty(
+        name="",
+        description="Select second object for multi-sensor scanning (optional)",
         type=bpy.types.Object,
         poll=scannerObjectPoll
     )
@@ -251,7 +261,188 @@ class ScannerProperties(PropertyGroup):
         default = False
     )
 
+    # Active scanner selector for tab-based UI
+    activeScanner: EnumProperty(
+        name="Active Scanner",
+        description="Select which scanner's settings to view and edit",
+        items=[
+            ('primary', "Primary Scanner", "Configure the primary scanner"),
+            ('secondary', "Secondary Scanner", "Configure the secondary scanner"),
+        ],
+        default='primary'
+    )
 
+    # Scanner type for secondary scanner
+    scannerType2: EnumProperty(
+        name="",
+        description="Select scanner type for secondary scanner",
+        items=[
+            (generic.ScannerType.static.name, generic.ScannerType.static.name, ""),
+            (generic.ScannerType.rotating.name, generic.ScannerType.rotating.name, ""),
+            (generic.ScannerType.sideScan.name, generic.ScannerType.sideScan.name, "")
+        ],
+        default=generic.ScannerType.sideScan.name
+    )
+
+    # ============================================================
+    # SECONDARY SCANNER SETTINGS (duplicates for independent config)
+    # ============================================================
+
+    # Secondary scanner - common FOV settings
+    fovX2: FloatProperty(
+        name = "Horizontal FOV",
+        description = "Horizontal field of view in degrees",
+        default = 90.0,
+        min = 0.0,
+        max = 360.0
+    )
+
+    fovY2: FloatProperty(
+        name = "Vertical FOV",
+        description = "Vertical field of view in degrees",
+        default = 45,
+        min = 0.0,
+        max = 360.0
+    )
+
+    # Secondary scanner - rotating lidar settings
+    xStepDegree2: FloatProperty(
+        name = "Resolution horizontal",
+        description = "distance between scan lines (degree)",
+        default = 1.0,
+        min = 0.01,
+        max = 360.0
+    )
+
+    yStepDegree2: FloatProperty(
+        name = "Resolution vertical",
+        description = "distance between scan lines (degree)",
+        default = 1.0,
+        min = 0.01,
+        max = 180.0
+    )
+
+    rotationsPerSecond2: FloatProperty(
+        name = "Rotations per second",
+        description = "Number of rotations the sensor performs in one second",
+        default = 10.0,
+        min = 0.01,
+        max = 1000.0
+    )
+
+    # Secondary scanner - static lidar settings
+    resolutionX2: IntProperty(
+        name = "Width",
+        description = "Number of pixels in x direction",
+        default = 320,
+        min = 1,
+        max = 1000000
+    )
+
+    resolutionY2: IntProperty(
+        name = "Height",
+        description = "Number of pixels in y direction",
+        default = 240,
+        min = 1,
+        max = 1000000,
+    )
+
+    resolutionPercentage2: IntProperty(
+        name = "Scale",
+        description = "Percentage to scale the resolution",
+        default = 100,
+        min = 1,
+        max = 100000
+    )
+
+    # Secondary scanner - sonar settings
+    fovSonar2: FloatProperty(
+        name = "FOV down",
+        description = "Downwards field of view in degrees",
+        default = 45.0,
+        min = 0.0,
+        max = 180.0
+    )
+
+    sonarStepDegree2: FloatProperty(
+        name = "Scan resolution",
+        description = "distance between scan lines (degree)",
+        default = 1.0,
+        min = 0.01,
+        max = 180.0
+    )
+
+    sonarMode3D2: BoolProperty(
+        name="3D Mode",
+        description="Enable or disable 3D data points",
+        default = False
+    )
+
+    sonarKeepRotation2: BoolProperty(
+        name="Use sensor rotation",
+        description="Decide if point slices should be perpendicular to sensor movement or aligned in one direction",
+        default = False
+    )
+
+    sourceLevel2: FloatProperty(
+        name = "Source level",
+        description = "The signals source level in dB",
+        default = 200.0,
+        min = 0.01,
+        max = 10000.0
+    )
+
+    noiseLevel2: FloatProperty(
+        name = "Noise level",
+        description = "The noise level in dB",
+        default = 50.0,
+        min = 0.01,
+        max = 10000.0
+    )
+
+    directivityIndex2: FloatProperty(
+        name = "Directivity index",
+        description = "The directivity index in dB",
+        default = 20.0,
+        min = 0.01,
+        max = 10000.0
+    )
+
+    processingGain2: FloatProperty(
+        name = "Processing gain",
+        description = "The processing gain in dB",
+        default = 10.0,
+        min = 0.01,
+        max = 10000.0
+    )
+
+    receptionThreshold2: FloatProperty(
+        name = "Reception threshold",
+        description = "The reception threshold in dB",
+        default = 10.0,
+        min = 0.01,
+        max = 10000.0
+    )
+
+    maxDistance2: FloatProperty(
+        name="Maximum distance",
+        description="",
+        default = 100.0,
+        min = 0.01,
+        max = 10000.0
+    )
+
+    simulateWaterProfile2: BoolProperty(
+        name="Simulate water profile",
+        description="Enable or disable simulation of the water profile for the secondary scanner",
+        default = False
+    )
+
+    surfaceHeight2: FloatProperty(
+        name="Water surface level", 
+        description="The height of the water surface for the secondary scanner",
+        default = 10.0
+    )
 
     # PRESETS
     scannerCategory: EnumProperty(
@@ -1440,11 +1631,11 @@ class WM_OT_GENERATE_POINT_CLOUDS(Operator):
         scene = context.scene
         properties = scene.scannerProperties
 
-        
+
         if properties.measureTime:
             startTime = time.time()
 
-            
+
         performScan(context, properties)
         
         """
@@ -1537,6 +1728,34 @@ class WM_OT_GENERATE_POINT_CLOUDS(Operator):
 
         return {'FINISHED'}
 
+class WM_OT_SCAN_BOTH(Operator):
+    bl_label = "Scan Both Sensors"
+    bl_idname = "wm.scan_both"
+    bl_description = "Run lidar scan with first sensor, then sonar scan with second sensor, and merge results"
+
+    def execute(self, context):
+        scene = context.scene
+        properties = scene.scannerProperties
+
+        if properties.scannerObject is None:
+            self.report({'ERROR'}, "First scanner object not selected!")
+            return {'CANCELLED'}
+
+        if properties.scannerObject2 is None:
+            self.report({'ERROR'}, "Second scanner object not selected!")
+            return {'CANCELLED'}
+
+        if properties.measureTime:
+            startTime = time.time()
+
+        # Perform multi-sensor scan
+        generic.performMultiSensorScan(context, properties)
+
+        if properties.measureTime:
+            print("Total multi-sensor execution time: %s s" % (time.time() - startTime))
+
+        return {'FINISHED'}
+
 # define UI panels
 class OBJECT_PT_MAIN_PANEL(MAIN_PANEL, Panel):
     bl_label = "Point clouds"
@@ -1550,15 +1769,75 @@ class OBJECT_PT_MAIN_PANEL(MAIN_PANEL, Panel):
         layout = self.layout
         scene = context.scene
         properties = scene.scannerProperties
-        
-        layout.label(text="Scanner object")
-        layout.prop(properties, "scannerObject")
+
+        # Scanner Objects Section
+        box = layout.box()
+        box.label(text="Scanner Objects", icon='OUTLINER_OB_CAMERA')
+
+        row = box.row()
+        col = row.column()
+        col.label(text="Primary:")
+        col.prop(properties, "scannerObject")
+
+        col = row.column()
+        col.label(text="Secondary:")
+        col.prop(properties, "scannerObject2")
+
+        layout.separator()
+
+        # Active Scanner Tab Selector
+        layout.label(text="Configure Scanner:")
+        layout.prop(properties, "activeScanner", expand=True)
 
         layout.separator()
 
         layout.prop(properties, "joinMeshes")
 
-        layout.operator("wm.execute_scan")
+        # Single scanner scan button
+        layout.operator("wm.execute_scan", text="Scan Active Scanner")
+
+
+class OBJECT_PT_MULTI_SENSOR_PANEL(MAIN_PANEL, Panel):
+    bl_parent_id = "OBJECT_PT_MAIN_PANEL"
+    bl_label = "Multi-Sensor Fusion"
+
+    @classmethod
+    def poll(self, context):
+        return context.object is not None
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        properties = scene.scannerProperties
+
+        # Show status of both scanners
+        box = layout.box()
+
+        row = box.row()
+        row.label(text="Primary:", icon='OUTLINER_OB_CAMERA')
+        if properties.scannerObject:
+            row.label(text=f"{properties.scannerObject.name} ({properties.scannerType})")
+        else:
+            row.label(text="Not set", icon='ERROR')
+
+        row = box.row()
+        row.label(text="Secondary:", icon='OUTLINER_OB_CAMERA')
+        if properties.scannerObject2:
+            row.label(text=f"{properties.scannerObject2.name} ({properties.scannerType2})")
+        else:
+            row.label(text="Not set", icon='REMOVE')
+
+        layout.separator()
+
+        # Scan Both button
+        col = layout.column()
+        col.scale_y = 1.5
+        col.enabled = properties.scannerObject is not None and properties.scannerObject2 is not None
+        col.operator("wm.scan_both", text="Scan Both Sensors", icon='PLAY')
+
+        if properties.scannerObject is None or properties.scannerObject2 is None:
+            layout.label(text="Select both scanners to enable", icon='INFO')
+
 
 class OBJECT_PT_PRESET_PANEL(MAIN_PANEL, Panel):
     bl_parent_id = "OBJECT_PT_MAIN_PANEL"
@@ -1610,10 +1889,10 @@ class OBJECT_PT_REFLECTIVITY_PANEL(MAIN_PANEL, Panel):
 
 class OBJECT_PT_SCANNER_PANEL(MAIN_PANEL, Panel):
     bl_parent_id = "OBJECT_PT_MAIN_PANEL"
-    bl_label = "Scanner"
+    bl_label = "Scanner Settings"
 
     @classmethod
-    def poll(self,context):
+    def poll(self, context):
         return context.object is not None
 
     def draw(self, context):
@@ -1621,95 +1900,127 @@ class OBJECT_PT_SCANNER_PANEL(MAIN_PANEL, Panel):
         scene = context.scene
         properties = scene.scannerProperties
 
-        layout.label(text="Scanner type")
-        layout.prop(properties, "scannerType")
+        # Determine which scanner we're configuring
+        is_primary = properties.activeScanner == 'primary'
+        suffix = "" if is_primary else "2"
+
+        # Show which scanner is being configured
+        if is_primary:
+            scanner_obj = properties.scannerObject
+            scanner_label = "Primary Scanner"
+        else:
+            scanner_obj = properties.scannerObject2
+            scanner_label = "Secondary Scanner"
+
+        box = layout.box()
+        row = box.row()
+        row.label(text=f"Configuring: {scanner_label}", icon='RADIOBUT_ON')
+        if scanner_obj:
+            row.label(text=f"({scanner_obj.name})")
+        else:
+            row.label(text="(Not set)", icon='ERROR')
 
         layout.separator()
 
-        if properties.scannerType == generic.ScannerType.sideScan.name:
-            layout.prop(properties, "fovSonar")
-            layout.prop(properties, "sonarStepDegree")
-            row = layout.row()
-            row.prop(properties, "sonarMode3D")
-            column = row.column()
-            column.prop(properties, "sonarKeepRotation")
-            column.enabled = not properties.sonarMode3D
-                
-            layout.separator()
+        # Scanner type selector - use appropriate property
+        layout.label(text="Scanner type")
+        type_prop = "scannerType" + suffix
+        layout.prop(properties, type_prop)
+        current_type = getattr(properties, type_prop)
 
-            layout.prop(properties, "sourceLevel")
-            layout.prop(properties, "noiseLevel")
-            layout.prop(properties, "directivityIndex")
-            layout.prop(properties, "processingGain")
-            layout.prop(properties, "receptionThreshold")
-            layout.prop(properties, "maxDistance")
+        layout.separator()
 
-            layout.separator()
-            layout.separator()
-            layout.separator()
+        # Show settings based on the selected scanner type
+        if current_type == generic.ScannerType.sideScan.name:
+            self.draw_sonar_settings(layout, properties, scene, suffix)
+        elif current_type == generic.ScannerType.rotating.name:
+            self.draw_rotating_settings(layout, properties, suffix)
+        elif current_type == generic.ScannerType.static.name:
+            self.draw_static_settings(layout, properties, suffix)
 
-            layout.label(text="Water profile")
-            layout.prop(properties, "simulateWaterProfile")
+    def draw_sonar_settings(self, layout, properties, scene, suffix):
+        # Sonar-specific properties with suffix
+        layout.prop(properties, "fovSonar" + suffix)
+        layout.prop(properties, "sonarStepDegree" + suffix)
+        row = layout.row()
+        row.prop(properties, "sonarMode3D" + suffix)
+        column = row.column()
+        column.prop(properties, "sonarKeepRotation" + suffix)
+        column.enabled = not getattr(properties, "sonarMode3D" + suffix)
 
-            profileColumn = layout.column()
-            profileColumn.enabled = properties.simulateWaterProfile
+        layout.separator()
 
-            profileColumn.prop(properties, "surfaceHeight")
+        layout.prop(properties, "sourceLevel" + suffix)
+        layout.prop(properties, "noiseLevel" + suffix)
+        layout.prop(properties, "directivityIndex" + suffix)
+        layout.prop(properties, "processingGain" + suffix)
+        layout.prop(properties, "receptionThreshold" + suffix)
+        layout.prop(properties, "maxDistance" + suffix)
 
-            # list adapted from https://blender.stackexchange.com/a/30446/95167
-            rows = 3
-            row = profileColumn.row()
-            row.template_list("CUSTOM_UL_items", "", scene, "custom", scene, "custom_index", rows=rows, sort_lock=True)
-            
-            profileColumn.label(text="New item")
-            row = profileColumn.row()
-            col = row.column(align=True)
-            row = col.row(align=True)
-            
-            row.prop(properties, "refractionDepth")
-            row.prop(properties, "refractionSpeed")
-            row.prop(properties, "refractionDensity")
-            col.separator()
-            col.operator("custom.add_items", icon='ADD')
-            col.operator("custom.remove_item", icon='REMOVE')
+        layout.separator()
 
-            col.separator()
-            col.separator()
-            col.separator()
+        # Water profile settings (shared - scene-level)
+        layout.label(text="Water profile (shared)")
+        # Water profile settings (per-scanner)
+        layout.prop(properties, "simulateWaterProfile" + suffix)
 
-            row = col.row(align=True)
-            row.operator("custom.clear_list", icon="X")
-                
-        elif properties.scannerType == generic.ScannerType.rotating.name:
-                layout.label(text="Horizontal")
-                horizontalLayout = layout.row()
-                horizontalLayout.prop(properties, "fovX")
-                horizontalLayout.prop(properties, "xStepDegree")
+        profileColumn = layout.column()
+        profileColumn.enabled = getattr(properties, "simulateWaterProfile" + suffix)
 
-                layout.label(text="Vertical")
-                horizontalLayout = layout.row()
-                horizontalLayout.prop(properties, "fovY")
-                horizontalLayout.prop(properties, "yStepDegree")
-            
-                layout.separator()
-                
-                layout.label(text="Rotation")
-                layout.prop(properties, "rotationsPerSecond")
+        profileColumn.prop(properties, "surfaceHeight" + suffix)
 
-        elif properties.scannerType == generic.ScannerType.static.name:
-            layout.label(text="Horizontal")
-            horizontalLayout = layout.row()
-            horizontalLayout.prop(properties, "fovX")
-            horizontalLayout.prop(properties, "resolutionX")
+        rows = 3
+        row = profileColumn.row()
+        row.template_list("CUSTOM_UL_items", "", scene, "custom", scene, "custom_index", rows=rows, sort_lock=True)
 
-            layout.label(text="Vertical")
-            horizontalLayout = layout.row()
-            horizontalLayout.prop(properties, "fovY")
-            horizontalLayout.prop(properties, "resolutionY")
+        profileColumn.label(text="New item")
+        row = profileColumn.row()
+        col = row.column(align=True)
+        row = col.row(align=True)
 
-            layout.separator()
+        row.prop(properties, "refractionDepth")
+        row.prop(properties, "refractionSpeed")
+        row.prop(properties, "refractionDensity")
+        col.separator()
+        col.operator("custom.add_items", icon='ADD')
+        col.operator("custom.remove_item", icon='REMOVE')
 
-            layout.prop(properties, "resolutionPercentage")
+        col.separator()
+
+        row = col.row(align=True)
+        row.operator("custom.clear_list", icon="X")
+
+    def draw_rotating_settings(self, layout, properties, suffix):
+        layout.label(text="Horizontal")
+        horizontalLayout = layout.row()
+        horizontalLayout.prop(properties, "fovX" + suffix)
+        horizontalLayout.prop(properties, "xStepDegree" + suffix)
+
+        layout.label(text="Vertical")
+        horizontalLayout = layout.row()
+        horizontalLayout.prop(properties, "fovY" + suffix)
+        horizontalLayout.prop(properties, "yStepDegree" + suffix)
+
+        layout.separator()
+
+        layout.label(text="Rotation")
+        layout.prop(properties, "rotationsPerSecond" + suffix)
+
+    def draw_static_settings(self, layout, properties, suffix):
+        layout.label(text="Horizontal")
+        horizontalLayout = layout.row()
+        horizontalLayout.prop(properties, "fovX" + suffix)
+        horizontalLayout.prop(properties, "resolutionX" + suffix)
+
+        layout.label(text="Vertical")
+        horizontalLayout = layout.row()
+        horizontalLayout.prop(properties, "fovY" + suffix)
+        horizontalLayout.prop(properties, "resolutionY" + suffix)
+
+        layout.separator()
+
+        layout.prop(properties, "resolutionPercentage" + suffix)
+
 
 class OBJECT_PT_ANIMATION_PANEL(MAIN_PANEL, Panel):
     bl_parent_id = "OBJECT_PT_MAIN_PANEL"
@@ -2120,7 +2431,9 @@ classes = (
 
     ScannerProperties,
     WM_OT_GENERATE_POINT_CLOUDS,
+    WM_OT_SCAN_BOTH,
     OBJECT_PT_MAIN_PANEL,
+    OBJECT_PT_MULTI_SENSOR_PANEL,
     OBJECT_PT_PRESET_PANEL,
     OBJECT_PT_SCANNER_PANEL,
     OBJECT_PT_REFLECTIVITY_PANEL,

@@ -400,6 +400,8 @@ def startScan(context, properties, objectName):
 
             startIndex += numberOfHits
 
+        print(f"Lidar scan produced {startIndex} hits")
+
         if not properties.exportSingleFrames:
             # we now have the final number of hits so we could shrink the array here
             # as explained here (https://stackoverflow.com/a/32398318/13440564), resizing
@@ -437,6 +439,382 @@ def startScan(context, properties, objectName):
                 print("No data to export!")
     if properties.measureTime:
         print("Scan time: %s s" % (time.time() - startTime))
+
+def performMultiSensorScan(context, properties):
+    """
+    Perform a multi-sensor scan using both lidar and sonar sensors.
+    First sensor is used for lidar (rotating/static), second for sonar (sideScan).
+    Results are merged into a single CSV output file.
+    """
+    import time as time_module
+
+    if properties.measureTime:
+        startTime = time_module.time()
+
+    # Store original settings
+    originalScannerObject = properties.scannerObject
+    originalScannerType = properties.scannerType
+
+    # Collect all hits from both sensors
+    allHits = []
+
+    # Get targets and material mappings (shared between both scans)
+    if properties.singleRay:
+        allTargets = [properties.targetObject]
+    else:
+        allTargets = []
+        for viewLayer in bpy.context.scene.view_layers:
+            for obj in viewLayer.objects:
+                if obj.type == 'MESH' and \
+                    obj.hide_get() == False and \
+                    obj.active_material != None:
+                        allTargets.append(obj)
+
+    targets = []
+    materialMappings = {}
+
+    for target in allTargets:
+        if len(target.material_slots) == 0:
+            continue
+
+        context.view_layer.objects.active = target
+
+        for modifier in target.modifiers:
+            bpy.ops.object.modifier_apply(modifier=modifier.name)
+
+        try:
+            from .. import material_helper
+            targetMaterials = material_helper.getTargetMaterials(properties.debugOutput, target)
+        except ValueError as e:
+            print(e)
+            print(f"The target object with name {target.name} will be ignored! ")
+            continue
+
+        targets.append(target)
+        targetMappings = material_helper.getFaceMaterialMapping(target.data)
+        materialMappings[target] = (targetMaterials, targetMappings)
+
+    (categoryIDs, partIDs) = getTargetIndices(targets, properties.debugOutput)
+
+    print("=== Starting Multi-Sensor Scan ===")
+
+    # Phase 1: Primary sensor scan
+    print(f"\n--- Phase 1: Primary Sensor ({properties.scannerType}) ---")
+    properties.scannerObject = originalScannerObject
+    # scannerType is already set to primary's type
+
+    if properties.scannerType == ScannerType.sideScan.name:
+        primaryHits = runSonarScan(context, properties, targets, materialMappings, categoryIDs, partIDs)
+        for hit in primaryHits: hit.sensor_id = "sonar"
+    else:
+        primaryHits = runLidarScan(context, properties, targets, materialMappings, categoryIDs, partIDs)
+        for hit in primaryHits: hit.sensor_id = "lidar"
+    allHits.extend(primaryHits)
+    print(f"Primary scan complete: {len(primaryHits)} hits")
+
+    # Phase 2: Secondary sensor scan
+    secondaryType = properties.scannerType2
+    print(f"\n--- Phase 2: Secondary Sensor ({secondaryType}) ---")
+
+    # Swap to secondary scanner settings
+    properties.scannerObject = properties.scannerObject2
+    properties.scannerType = secondaryType
+
+    # Store primary settings and swap to secondary settings
+    primary_settings = {}
+    secondary_props = [
+        'fovX', 'fovY', 'xStepDegree', 'yStepDegree', 'rotationsPerSecond',
+        'resolutionX', 'resolutionY', 'resolutionPercentage',
+        'fovSonar', 'sonarStepDegree', 'sonarMode3D', 'sonarKeepRotation',
+        'sourceLevel', 'noiseLevel', 'directivityIndex', 'processingGain',
+        'receptionThreshold', 'maxDistance', 'simulateWaterProfile', 'surfaceHeight',
+        'reflectivityLower', 'distanceLower', 'reflectivityUpper', 'distanceUpper', 'maxReflectionDepth',
+        'addNoise', 'mu', 'sigma', 'noiseType', 'noiseAbsoluteOffset', 'noiseRelativeOffset',
+        'simulateRain', 'rainfallRate', 'simulateDust', 'particleRadius', 'particlesPcm', 'dustCloudStart', 'dustCloudLength'
+    ]
+    for prop in secondary_props:
+        if hasattr(properties, prop) and hasattr(properties, prop + '2'):
+            primary_settings[prop] = getattr(properties, prop)
+            setattr(properties, prop, getattr(properties, prop + '2'))
+
+    if secondaryType == ScannerType.sideScan.name:
+        secondaryHits = runSonarScan(context, properties, targets, materialMappings, categoryIDs, partIDs)
+        for hit in secondaryHits: hit.sensor_id = "sonar"
+    else:
+        secondaryHits = runLidarScan(context, properties, targets, materialMappings, categoryIDs, partIDs)
+        for hit in secondaryHits: hit.sensor_id = "lidar"
+    allHits.extend(secondaryHits)
+    print(f"Secondary scan complete: {len(secondaryHits)} hits")
+
+    # Restore primary settings
+    for prop, value in primary_settings.items():
+        setattr(properties, prop, value)
+
+    # Restore original settings
+    properties.scannerObject = originalScannerObject
+    properties.scannerType = originalScannerType
+
+    # Phase 3: Merging Results and Creating Meshes
+    print("\n--- Phase 3: Merging Results ---")
+    print(f"Total hits from both sensors: {len(allHits)}")
+
+    if len(allHits) > 0:
+        # Convert to numpy array for export
+        scannedValues = np.array(allHits, dtype=object)
+
+        # Print summary for debugging
+        sonar_count = sum(1 for h in allHits if h.sensor_id == "sonar")
+        lidar_count = sum(1 for h in allHits if h.sensor_id == "lidar")
+        print(f"Export summary: {sonar_count} sonar hits, {lidar_count} lidar hits")
+
+        # Add meshes separately for each sensor
+        if properties.addMesh:
+            if len(primaryHits) > 0:
+                primary_mesh_name = f"primary_{originalScannerType}_mesh"
+                addMeshToScene(primary_mesh_name, np.array(primaryHits, dtype=hit_info.HitInfo), False)
+                print(f"Created primary mesh: {primary_mesh_name} with {len(primaryHits)} points")
+            
+            if len(secondaryHits) > 0:
+                secondary_mesh_name = f"secondary_{secondaryType}_mesh"
+                addMeshToScene(secondary_mesh_name, np.array(secondaryHits, dtype=hit_info.HitInfo), False)
+                print(f"Created secondary mesh: {secondary_mesh_name} with {len(secondaryHits)} points")
+
+        # Export merged data
+        cleanedFileName = removeInvalidCharatersFromFileName(properties.dataFileName + "_multi_sensor")
+        exportNoiseData = properties.addNoise or properties.addConstantNoise
+
+        if properties.exportLAS or properties.exportHDF or properties.exportCSV or properties.exportPLY:
+            fileExporter = exporter.Exporter(
+                properties.dataFilePath,
+                cleanedFileName,
+                cleanedFileName,
+                scannedValues,
+                targets,
+                categoryIDs,
+                partIDs,
+                materialMappings,
+                exportNoiseData,
+                0, 0
+            )
+
+            if properties.exportLAS:
+                fileExporter.exportLAS()
+
+            if properties.exportHDF:
+                fileExporter.exportHDF()
+
+            if properties.exportCSV:
+                fileExporter.exportCSV()
+
+            if properties.exportPLY:
+                fileExporter.exportPLY()
+    else:
+        print("No data to export!")
+
+    if properties.measureTime:
+        print(f"Multi-sensor scan time: {time_module.time() - startTime} s")
+
+    print("=== Multi-Sensor Scan Complete ===")
+
+
+def runLidarScan(context, properties, targets, materialMappings, categoryIDs, partIDs):
+    """Run a lidar scan and return the hits as a list."""
+    depsgraph = context.evaluated_depsgraph_get()
+    trees = {}
+
+    if properties.enableAnimation:
+        firstFrame = properties.frameStart
+        lastFrame = properties.frameEnd
+        frameStep = properties.frameStep
+        frameRate = properties.frameRate
+        angularFractionPerFrame = properties.rotationsPerSecond / frameRate * properties.fovX
+        if angularFractionPerFrame > 360.0:
+            angularFractionPerFrame = 360.0
+    else:
+        firstFrame = bpy.context.scene.frame_current
+        lastFrame = bpy.context.scene.frame_current
+        frameStep = 1
+        frameRate = 1
+        angularFractionPerFrame = properties.fovX
+
+    if properties.scannerType == ScannerType.rotating.name:
+        stepsX = properties.xStepDegree
+        stepsY = properties.yStepDegree
+        xSteps = angularFractionPerFrame / stepsX + 1
+        ySteps = properties.fovY / stepsY + 1
+        totalNumberOfRays = int(xSteps) * int(ySteps)
+    else:  # static
+        stepsX = int(properties.resolutionX * (properties.resolutionPercentage / 100))
+        stepsY = int(properties.resolutionY * (properties.resolutionPercentage / 100))
+        totalNumberOfRays = stepsX * stepsY
+
+    frameRange = range(firstFrame, lastFrame + 1, frameStep)
+    scannedValues = np.full(len(frameRange) * totalNumberOfRays, None, dtype=object)
+    startIndex = 0
+
+    for frameNumber in frameRange:
+        trees = getBVHTrees(trees, targets, depsgraph)
+
+        halfFOV = properties.fovX / 2.0
+        if properties.enableAnimation and properties.scannerType == ScannerType.rotating.name:
+            intervalStart = -halfFOV + ((frameNumber - 1) * angularFractionPerFrame) % 360
+            intervalEnd = intervalStart + angularFractionPerFrame
+        else:
+            intervalStart = -halfFOV
+            intervalEnd = halfFOV
+
+        if properties.enableAnimation:
+            bpy.context.scene.frame_set(frameNumber)
+
+        numberOfHits = lidar.performScan(
+            context,
+            properties.scannerType, properties.scannerObject,
+            properties.reflectivityLower, properties.distanceLower, properties.reflectivityUpper, properties.distanceUpper, properties.maxReflectionDepth,
+            intervalStart, intervalEnd, properties.fovX, stepsX, properties.fovY, stepsY, properties.resolutionPercentage,
+            scannedValues, startIndex,
+            firstFrame, lastFrame, frameNumber, properties.rotationsPerSecond,
+            properties.addNoise, properties.noiseType, properties.mu, properties.sigma, properties.addConstantNoise, properties.noiseAbsoluteOffset, properties.noiseRelativeOffset,
+            properties.simulateRain, properties.rainfallRate,
+            properties.simulateDust, properties.particleRadius, properties.particlesPcm, properties.dustCloudLength, properties.dustCloudStart,
+            False,  # addMesh - we'll add mesh at the end
+            False, False, False, False,  # exports - we'll export at the end
+            False, False, False, False, 0, 0,  # image exports
+            properties.dataFilePath, properties.dataFileName,
+            properties.debugLines, properties.debugOutput, properties.outputProgress, properties.measureTime, properties.singleRay, properties.destinationObject, properties.targetObject,
+            targets, materialMappings,
+            categoryIDs, partIDs, trees, depsgraph
+        )
+
+        startIndex += numberOfHits
+
+    # Return only the valid hits as a list
+    return [hit for hit in scannedValues[:startIndex] if hit is not None]
+
+
+def runSonarScan(context, properties, targets, materialMappings, categoryIDs, partIDs):
+    """Run a sonar scan and return the hits as a list."""
+    # Check sonar-specific requirements
+    if properties.scannerObject.matrix_world.translation.z > properties.surfaceHeight:
+        print("WARNING: Sonar sensor is above water level!")
+        return []
+
+    # Prepare water profile depth list
+    if properties.simulateWaterProfile:
+        value = np.empty((), dtype=object)
+        value[()] = (0.0, 0.0, 0.0)
+        depthList = np.full(len(context.scene.custom.items()), value)
+
+        for index, item in enumerate(context.scene.custom.items()):
+            depthList[index] = (properties.surfaceHeight - item[1].depth, item[1].speed, item[1].density)
+    else:
+        depthList = []
+
+    # Run sonar scan and capture results directly
+    return runSonarScanWithCapture(context, properties, targets, materialMappings, categoryIDs, partIDs, depthList)
+
+
+def runSonarScanWithCapture(context, properties, targets, materialMappings, categoryIDs, partIDs, depthList):
+    """Run sonar scan and capture the hits directly."""
+    from mathutils import Vector, Quaternion
+    from math import radians
+    import math
+
+    sensor = properties.scannerObject
+    depsgraph = context.evaluated_depsgraph_get()
+
+    xRange = np.array([-90, 90])
+    ySteps = (properties.fovSonar / 2.0) / properties.sonarStepDegree + 1
+    yRange = np.linspace(-89.999, -90 + (properties.fovSonar / 2.0), int(ySteps))
+
+    if properties.enableAnimation:
+        firstFrame = properties.frameStart
+        lastFrame = properties.frameEnd
+        frameStep = properties.frameStep
+    else:
+        firstFrame = bpy.context.scene.frame_current
+        lastFrame = bpy.context.scene.frame_current
+        frameStep = 1
+
+    totalNumberOfRays = xRange.size * yRange.size * int((lastFrame - firstFrame + 1) / frameStep)
+    scannedValues = np.full(totalNumberOfRays, None, dtype=object)
+
+    trees = {}
+    valueIndex = 0
+
+    startLocation = sensor.matrix_world.translation.copy()
+
+    bpy.context.scene.frame_set(firstFrame)
+
+    # Progress tracking
+    frameList = list(range(firstFrame, lastFrame + 1, frameStep))
+    totalFrames = len(frameList)
+
+    for frameIdx, frameNumber in enumerate(frameList):
+        if properties.outputProgress and totalFrames > 1:
+            updateProgress("Sonar scan", (frameIdx + 1) / totalFrames)
+
+        bpy.context.scene.frame_set(frameNumber)
+        trees = getBVHTrees(trees, targets, depsgraph)
+
+        origin = sensor.matrix_world.translation
+        sensorHeight = origin.z
+        traveledDistance = math.sqrt((startLocation.x - origin.x)**2 + (startLocation.y - origin.y)**2 + (startLocation.z - origin.z)**2)
+
+        for x in xRange:
+            quatX = Quaternion((0.0, 1.0, 0.0), radians(x))
+
+            for y in yRange:
+                quatY = Quaternion((1.0, 0.0, 0.0), radians(y))
+                vec = Vector((0.0, 0.0, -1.0))
+                quatAll = quatX @ quatY
+                vec.rotate(quatAll)
+                vec.rotate(sensor.matrix_world.decompose()[1])
+
+                destination = vec + sensor.matrix_world.translation
+                direction = (destination - origin).normalized()
+
+                closestHit = sonar.castRay(
+                    targets, trees, origin, direction, properties.maxDistance,
+                    materialMappings, depsgraph, properties.debugLines, properties.debugOutput,
+                    properties.sourceLevel, properties.noiseLevel, properties.directivityIndex,
+                    properties.processingGain, properties.receptionThreshold
+                )
+
+                if closestHit is not None:
+                    if "partID" in closestHit.target:
+                        partIDIndex = closestHit.target["partID"]
+                    else:
+                        partIDIndex = closestHit.target.material_slots[materialMappings[closestHit.target][closestHit.faceIndex]].name
+
+                    closestHit.categoryID = categoryIDs[closestHit.target["categoryID"]]
+                    closestHit.partID = partIDs[partIDIndex]
+
+                    # Apply noise if enabled
+                    noise = properties.noiseAbsoluteOffset + (closestHit.distance * properties.noiseRelativeOffset / 100.0)
+                    noiseDistance = closestHit.distance + noise
+                    noiseDirection = direction.normalized() * noiseDistance
+                    noiseLocation = noiseDirection + origin
+
+                    closestHit.noiseLocation = noiseLocation
+                    closestHit.noiseDistance = noiseDistance
+
+                    if not properties.sonarMode3D:
+                        if properties.sonarKeepRotation:
+                            closestHit.location = Vector((direction.x, direction.y, 0)).normalized() * closestHit.distance + origin
+                        else:
+                            if x > 0:
+                                closestHit.location.x = -closestHit.distance
+                            else:
+                                closestHit.location.x = closestHit.distance
+                            closestHit.location.y = traveledDistance
+                            closestHit.location.z = startLocation.z
+
+                    closestHit.sensor_id = "sonar"
+                    scannedValues[valueIndex] = closestHit
+                    valueIndex += 1
+
+    return [hit for hit in scannedValues[:valueIndex] if hit is not None]
+
 
 def getBVHTrees(trees, targets, depsgraph):
     for target in targets:

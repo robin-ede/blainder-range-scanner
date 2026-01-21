@@ -26,6 +26,11 @@ class Exporter:
         else:
             self.mappedData = np.array(list(map(lambda hit: self.tupleToArray(hit), data))).transpose()
 
+        print(f"Exporter initialized with {len(data)} hits.")
+        if len(data) > 0:
+            unique_sensors = set(h.sensor_id for h in data)
+            print(f"Unique sensors in data: {unique_sensors}")
+
     def tupleToArray(self, hit):
         return np.array([
             hit.categoryID, hit.partID,                                             # 0, 1   
@@ -61,7 +66,7 @@ class Exporter:
 
     def exportCSV(self):
         from . import export_csv
-        export_csv.export(self.filePath, self.fileName, self.mappedData.transpose(), self.exportNoiseData)
+        export_csv.export(self.filePath, self.fileName, self.mappedData.transpose(), self.exportNoiseData, self.data)
         
     def exportPLY(self):
         from . import export_ply

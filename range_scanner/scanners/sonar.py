@@ -381,9 +381,12 @@ def performScan(context,
                                 closestHit.location.x = -closestHit.distance
                             else:
                                 closestHit.location.x = closestHit.distance
-                            
+
                             closestHit.location.y = traveledDistance
                             closestHit.location.z = startLocation.z
+
+                    # set sensor identification
+                    closestHit.sensor_id = "sonar"
 
                     # save closest hit into array
                     scannedValues[valueIndex] = closestHit
