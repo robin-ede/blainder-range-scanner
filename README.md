@@ -6,6 +6,27 @@ This Blender add-on enables you to simulate lidar, sonar and time of flight scan
 
 The paper can be found here: https://www.mdpi.com/1424-8220/21/6/2144
 
+## Project Snapshot
+
+This fork extends the original scanner with a validation workflow focused on dual-sensor mapping: above-water plus below-water scanning, alignment, degradation studies, fusion/reconstruction metrics, and real-bathymetry based validation.
+
+If you are new to the repo, start here:
+
+- `docs/project-overview.md` - what the capstone fork is trying to prove
+- `docs/repo-map.md` - where the important code and scripts live
+- `scripts/README.md` - which script entrypoints are canonical
+- `docs/validation/real-bathymetry.md` - processed bathy + real point workflows
+- `docs/validation/current-results.md` - plain-English summary of what is already demonstrated
+
+Quick validation entrypoint:
+
+```bash
+python scripts/run_fixed_scene_validation_batch.py \
+  --blender "/Applications/Blender.app/Contents/MacOS/Blender" \
+  --scene example_scenes/sonar_example.blend \
+  --config scripts/fixed_scene_validation.example.json
+```
+
 ## Original scene
 
 <img src="images/part_segmentation_scene.png" width="500">
@@ -50,10 +71,9 @@ Supported formats:
 **[Installation](#installation)**<br>
 **[Dependencies](#dependencies)**<br>
 **[Usage (GUI)](#usage-gui)**<br>
-**[Usage (command line)](#usage-command-line)**<br>
+**[Validation Workflows](#validation-workflows)**<br>
 **[Visualization](#visualization)**<br>
 **[Examples](#examples)**<br>
-**[Scene generation](#automatic-scene-generation)**<br>
 **[Development](#development)**<br>
 **[About](#about)**<br>
 **[License](#license)**<br>
@@ -291,7 +311,7 @@ To simulate rain, just set the amount of rain in millimeters per hour (see [this
 
 ![alt text](images/scanner_panel_dust.png)
 
-For dust simulation, you can set the parameters to define a dust cloud starting at a given distance and with a given length (see [this paper]( https://doi.org/10.1002/rob.21701)).
+For dust simulation, you can set the parameters to define a dust cloud starting at a given distance and with a given length (see [this paper](https://doi.org/10.1002/rob.21701)).
 
 <br />
 
@@ -327,106 +347,206 @@ These options are only meant for debugging the add-on. Use them with caution as 
 
 <br /><br />
 
-## Usage (command line)
-When the code is located inside the `addons_contrib` directory (see [script usage](#script-usage)), you can use the scanner function via script the following way:
+## Validation Workflows
 
+For command-line and scripted use, the repository now centers on the validation
+runner scripts in `scripts/` rather than the older long-form inline API examples.
+See `scripts/README.md` for the script map and `docs/repo-map.md` for where the
+ major code paths live.
+
+### Fixed-scene validation experiments
+
+For repeatable multi-sensor validation runs without the GUI, this fork also exposes a direct Python helper:
 
 ```python
 import bpy
 import range_scanner
 
-# Kinect
-range_scanner.ui.user_interface.scan_static(
-    bpy.context, 
+result = range_scanner.ui.user_interface.scan_multi_sensor(
+    bpy.context,
+    primary_config={
+        "scannerObject": "Camera",
+        "scannerType": "rotating",
+        "fovX": 30.0,
+        "fovY": 40.0,
+        "xStepDegree": 0.2,
+        "yStepDegree": 0.33,
+        "rotationsPerSecond": 20.0,
+        "reflectivityLower": 0.0,
+        "distanceLower": 0.0,
+        "reflectivityUpper": 0.0,
+        "distanceUpper": 99999.9,
+        "maxReflectionDepth": 10,
+    },
+    secondary_config={
+        "scannerObject": "Camera.001",
+        "scannerType": "sideScan",
+        "maxDistance": 100.0,
+        "fovSonar": 135.0,
+        "sonarStepDegree": 0.25,
+        "sonarMode3D": True,
+        "sonarKeepRotation": False,
+        "sourceLevel": 220.0,
+        "noiseLevel": 63.0,
+        "directivityIndex": 20.0,
+        "processingGain": 10.0,
+        "receptionThreshold": 10.0,
+        "simulateWaterProfile": False,
+        "surfaceHeight": 10.0,
+    },
+    common_config={
+        "dataFilePath": "//output",
+        "dataFileName": "baseline_clean",
+        "addMesh": False,
+        "exportCSV": False,
+        "exportLAS": False,
+        "exportHDF": False,
+        "exportPLY": False,
+        "enableAnimation": False,
+        "frameStart": 1,
+        "frameEnd": 1,
+        "frameStep": 1,
+        "frameRate": 1,
+        "addNoise": False,
+        "addConstantNoise": False,
+        "noiseType": "gaussian",
+        "mu": 0.0,
+        "sigma": 0.01,
+        "noiseAbsoluteOffset": 0.0,
+        "noiseRelativeOffset": 0.0,
+        "simulateRain": False,
+        "rainfallRate": 0.0,
+        "debugLines": False,
+        "debugOutput": False,
+        "outputProgress": True,
+        "measureTime": False,
+        "singleRay": False,
+        "joinMeshes": False,
+    },
+    water_profile=[],
+)
 
-    scannerObject=bpy.context.scene.objects["Camera"],
-
-    resolutionX=100, fovX=60, resolutionY=100, fovY=60, resolutionPercentage=100,
-
-    reflectivityLower=0.0, distanceLower=0.0, reflectivityUpper=0.0, distanceUpper=99999.9, maxReflectionDepth=10,
-    
-    enableAnimation=False, frameStart=1, frameEnd=1, frameStep=1, frameRate=1,
-
-    addNoise=False, noiseType='gaussian', mu=0.0, sigma=0.01, noiseAbsoluteOffset=0.0, noiseRelativeOffset=0.0,
-
-    simulateRain=False, rainfallRate=0.0, 
-
-    addMesh=True,
-
-    exportLAS=False, exportHDF=False, exportCSV=False, exportPLY=False, exportSingleFrames=False,
-    exportRenderedImage=False, exportSegmentedImage=False, exportPascalVoc=False, exportDepthmap=False, depthMinDistance=0.0, depthMaxDistance=100.0, 
-    dataFilePath="//output", dataFileName="output file",
-    
-    debugLines=False, debugOutput=False, outputProgress=True, measureTime=False, singleRay=False, destinationObject=None, targetObject=None
-)       
-
-
-
-
-
-# Velodyne
-range_scanner.ui.user_interface.scan_rotating(
-    bpy.context, 
-
-    scannerObject=bpy.context.scene.objects["Camera"],
-
-    xStepDegree=0.2, fovX=30.0, yStepDegree=0.33, fovY=40.0, rotationsPerSecond=20,
-
-    reflectivityLower=0.0, distanceLower=0.0, reflectivityUpper=0.0, distanceUpper=99999.9, maxReflectionDepth=10,
-    
-    enableAnimation=False, frameStart=1, frameEnd=1, frameStep=1, frameRate=1,
-
-    addNoise=False, noiseType='gaussian', mu=0.0, sigma=0.01, noiseAbsoluteOffset=0.0, noiseRelativeOffset=0.0, 
-
-    simulateRain=False, rainfallRate=0.0, 
-
-    addMesh=True,
-
-    exportLAS=False, exportHDF=False, exportCSV=False, exportPLY=False, exportSingleFrames=False,
-    dataFilePath="//output", dataFileName="output file",
-    
-    debugLines=False, debugOutput=False, outputProgress=True, measureTime=False, singleRay=False, destinationObject=None, targetObject=None
-)  
-
-
-
-
-
-# Sonar
-range_scanner.ui.user_interface.scan_sonar(
-    bpy.context, 
-
-    scannerObject=bpy.context.scene.objects["Camera"],
-
-    maxDistance=100.0, fovSonar=135.0, sonarStepDegree=0.25, sonarMode3D=True, sonarKeepRotation=False,
-
-    sourceLevel=220.0, noiseLevel=63.0, directivityIndex=20.0, processingGain=10.0, receptionThreshold=10.0,   
-
-    simulateWaterProfile=True, depthList= [
-        (15.0, 1.333, 1.0),
-        (14.0, 1.0, 1.1),
-        (12.5, 1.52, 1.3),
-        (11.23, 1.4, 1.1),
-        (7.5, 1.2, 1.4),
-        (5.0, 1.333, 1.5),
-    ],
-
-    enableAnimation=True, frameStart=1, frameEnd=1, frameStep=1,
-
-    addNoise=False, noiseType='gaussian', mu=0.0, sigma=0.01, noiseAbsoluteOffset=0.0, noiseRelativeOffset=0.0, 
-
-    simulateRain=False, rainfallRate=0.0, 
-
-    addMesh=True,
-
-    exportLAS=False, exportHDF=False, exportCSV=False, exportPLY=False, exportSingleFrames=False,
-    dataFilePath="//output", dataFileName="output file",
-    
-    debugLines=False, debugOutput=False, outputProgress=True, measureTime=False, singleRay=False, destinationObject=None, targetObject=None
-)  
+print(result["report_path"])
 ```
 
-The script can then be run by executing `blender myscene.blend --background --python myscript.py` on the command line.
+For batch experiments on one fixed `.blend` scene, use `scripts/run_fixed_scene_validation_batch.py` with `scripts/fixed_scene_validation.example.json`, `scripts/fixed_scene_noise_sweep.example.json`, or `scripts/fixed_scene_pose_sweep.example.json` as a template. The batch runner launches a fresh Blender process per trial so destructive scene mutations do not leak between runs.
+
+```bash
+python3 scripts/run_fixed_scene_validation_batch.py \
+  --blender blender \
+  --scene path/to/fixed_scene.blend \
+  --config scripts/fixed_scene_noise_sweep.example.json
+```
+
+After the batch finishes, it writes:
+
+* one per-trial validation report for each run
+* one batch summary JSON
+* one batch summary CSV
+
+The summary files are written into the configured output directory by default, unless you pass `--summary-dir`.
+
+Pose sweeps are supported with `primary_pose_defaults`, `secondary_pose_defaults`, `primary_pose`, and `secondary_pose` entries in the batch config. Each pose can include:
+
+* `location`: `[x, y, z]`
+* `rotation_euler_rad`: `[rx, ry, rz]`
+* `rotation_euler_deg`: `[rx, ry, rz]`
+* `look_at`: `[x, y, z]`
+
+If you want the sensors to keep aiming at a shared target while moving between trials, set `look_at` in the pose defaults and vary only `location` per trial.
+
+To automate a full validation pass that first selects the best static pose and then runs a noise sweep on that pose, use `scripts/run_pose_then_noise_validation.py` with `scripts/pose_then_noise_validation.example.json`:
+
+```bash
+python3 scripts/run_pose_then_noise_validation.py \
+  --blender "/Applications/Blender.app/Contents/MacOS/Blender" \
+  --scene generated_scenes/dual_sensor_scene_42.blend \
+  --config scripts/pose_then_noise_validation.example.json
+```
+
+By default, the combined workflow ranks pose trials by `point_count`, keeps the top pose, runs the configured noise sweep for it, and writes a combined CSV/JSON summary.
+
+For more stable validation runs, you can set `common_defaults.noiseSeed` in the noise sweep config. That makes repeated runs with the same scene/config produce repeatable measurement-noise realizations.
+
+Pose selection also supports a `composite` strategy with weighted terms like `point_count`, `sensor_balance`, `rmse`, and `p95`. This is useful when you do not want the selector to over-favor lidar-heavy poses solely because they produce more total hits.
+
+You can also scale this workflow across multiple seeded scenes with `scripts/run_multi_seed_pose_then_noise_validation.py` and `scripts/multi_seed_pose_then_noise_validation.example.json`:
+
+```bash
+python3 scripts/run_multi_seed_pose_then_noise_validation.py \
+  --blender "/Applications/Blender.app/Contents/MacOS/Blender" \
+  --config scripts/multi_seed_pose_then_noise_validation.example.json
+```
+
+This multi-seed runner can generate the seeded scenes automatically, run the pose-then-noise workflow for each seed, and write an aggregate CSV/JSON summary across scenes.
+
+If you want to move toward mapping-style validation, the next step is to animate the two sensors deterministically and evaluate the accumulated point cloud over the full frame range. You can create an animated scene from an existing seeded scene with:
+
+```bash
+"/Applications/Blender.app/Contents/MacOS/Blender" generated_scenes/dual_sensor_scene_42.blend \
+  --background \
+  --python scripts/create_animated_validation_scene.py -- \
+  --output-scene generated_scenes/dual_sensor_scene_42_animated.blend \
+  --frame-start 1 \
+  --frame-end 20
+```
+
+Then run accumulated animated validation with:
+
+```bash
+python3 scripts/run_fixed_scene_validation_batch.py \
+  --blender "/Applications/Blender.app/Contents/MacOS/Blender" \
+  --scene generated_scenes/dual_sensor_scene_42_animated.blend \
+  --config scripts/animated_accumulated_validation.example.json
+```
+
+When `enableAnimation` is true, the current validation report treats all captured points across the configured frame range as one accumulated pre-fusion map and compares that combined result against the ground-truth surface.
+
+To compare several deterministic animation paths, use `scripts/run_animated_path_validation.py` with `scripts/animated_path_validation.example.json`:
+
+```bash
+python3 scripts/run_animated_path_validation.py \
+  --blender "/Applications/Blender.app/Contents/MacOS/Blender" \
+  --base-scene generated_scenes/dual_sensor_scene_42.blend \
+  --config scripts/animated_path_validation.example.json
+```
+
+This creates one animated `.blend` per path, runs accumulated validation on each path, and writes an aggregate CSV/JSON summary so you can compare mapping-oriented trajectories directly.
+
+Waypoint-based paths are supported, so you can model more traditional coverage trajectories such as a lawnmower or snake pattern across a rectangular area. In `scripts/animated_path_validation.example.json`, the `lawnmower_cover` path uses `primary_waypoints` and `secondary_waypoints` to sweep back and forth across the scene while keeping both sensors aimed at a common target region.
+
+### Seeded random dual-sensor scenes
+
+If you do not already have a scene that works for both sensors, generate one with:
+
+```bash
+blender --background --python scripts/generate_seeded_dual_sensor_scene.py -- \
+  --seed 42 \
+  --output-dir generated_scenes
+```
+
+This creates:
+
+* `generated_scenes/dual_sensor_scene_42.blend`
+* `generated_scenes/dual_sensor_scene_42.metadata.json`
+
+The generated scene includes:
+
+* `Camera` for the primary sensor
+* `Camera.001` for the secondary sensor
+* above-water and underwater randomized mesh targets with materials
+* a water surface at `z = 0.0`
+
+To generate several seeded scenes at once:
+
+```bash
+python3 scripts/generate_seeded_dual_sensor_batch.py \
+  --blender blender \
+  --output-dir generated_scenes \
+  --seeds 42 43 44
+```
+
+Then run your fixed-scene validation batch against one of the generated `.blend` files.
 
 <br /><br />
 
@@ -448,23 +568,11 @@ This will generate a `cloud.js` file which you can drag and drop inside the Potr
 
 ## Examples
 
-See [examples folder](./example_scenes/). 
+See [`example_scenes/`](./example_scenes/).
 
-The `.blend` files contain preconfigured scenes. Example outputs are located inside the `output` folder, the used models can be found inside the `models` directory.
-
-<br /><br />
-
-## Automatic scene generation
-
-See [scene generation folder](./scene_generation/).
-
-To generate a random landscape scene, run the following command on the command line:
-
-```
-python generate_landscapes.py
-```
-
-All parameters can be adjusted inside `landscape.py`. Example scenes are located inside the `generated` folder.
+The curated example scene for this fork is `example_scenes/sonar_example.blend`.
+The older legacy example scenes were removed to keep the repository focused on
+the current validation and dual-sensor workflow.
 
 <br /><br />
 
@@ -519,7 +627,3 @@ A brief summary of this license can be found here: https://tldrlegal.com/license
 <br />
 
 Commercial license: If you want to use this software without complying with the conditions of the GPL-3.0 license, you can get a custom license. If you wish to obtain such a license, please feel free to contact me at <a href="mailto:lorenzo.neumann@informatik.tu-freiberg.de?subject=[BLAINDER] License request">lorenzo.neumann@informatik.tu-freiberg.de</a> or via an issue.
-
-<br />
-
-Chair model used: [Low Poly Chair](https://free3d.com/de/3d-model/chair-255345.html)
