@@ -1,0 +1,80 @@
+{
+  "common_defaults": {
+    "dataFilePath": "//output/real_bathy_validation",
+    "referenceDepthFile": null,
+    "addMesh": false,
+    "exportCSV": false,
+    "exportLAS": true,
+    "exportHDF": false,
+    "exportPLY": false,
+    "exportSingleFrames": false,
+    "enableAnimation": false,
+    "frameStart": 1,
+    "frameEnd": 1,
+    "frameStep": 1,
+    "frameRate": 10,
+    "noiseSeed": 42,
+    "addNoise": true,
+    "noiseType": "gaussian",
+    "mu": 0.0,
+    "sigma": 0.03,
+    "debugLines": false,
+    "debugOutput": false,
+    "outputProgress": true,
+    "measureTime": true,
+    "singleRay": false,
+    "joinMeshes": false
+  },
+  "primary_defaults": {
+    "scannerObject": "Camera",
+    "scannerType": "rotating",
+    "fovX": 30.0,
+    "fovY": 40.0,
+    "xStepDegree": 0.2,
+    "yStepDegree": 0.33,
+    "rotationsPerSecond": 20.0,
+    "reflectivityLower": 0.0,
+    "distanceLower": 0.0,
+    "reflectivityUpper": 0.0,
+    "distanceUpper": 99999.9,
+    "maxReflectionDepth": 10
+  },
+  "secondary_defaults": {
+    "scannerObject": "Camera.001",
+    "scannerType": "sideScan",
+    "maxDistance": 100.0,
+    "fovSonar": 135.0,
+    "sonarStepDegree": 0.25,
+    "sonarMode3D": true,
+    "sonarKeepRotation": false,
+    "sourceLevel": 220.0,
+    "noiseLevel": 63.0,
+    "directivityIndex": 20.0,
+    "processingGain": 10.0,
+    "receptionThreshold": 10.0,
+    "simulateWaterProfile": false,
+    "surfaceHeight": 0.0
+  },
+  "water_profile": [],
+  "trials": [
+    {
+      "trial_name": "real_bathy_baseline",
+      "common": {
+        "dataFileName": "real_bathy_baseline",
+        "addNoise": false,
+        "gnssDriftMeters": 0.0,
+        "seaStateAmplitudeMeters": 0.0
+      }
+    },
+    {
+      "trial_name": "real_bathy_noisy",
+      "common": {
+        "dataFileName": "real_bathy_noisy",
+        "addNoise": true,
+        "sigma": 0.03,
+        "gnssDriftMeters": 0.0,
+        "seaStateAmplitudeMeters": 0.0
+      }
+    }
+  ]
+}

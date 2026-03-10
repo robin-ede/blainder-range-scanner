@@ -6,62 +6,59 @@ import bpy
 from bpy import context
 import sys
 
-from bpy.props import (StringProperty,
-                       BoolProperty,
-                       IntProperty,
-                       FloatProperty,
-                       FloatVectorProperty,
-                       EnumProperty,
-                       PointerProperty,
-                       CollectionProperty,
-                       )
+from bpy.props import (
+    StringProperty,
+    BoolProperty,
+    IntProperty,
+    FloatProperty,
+    FloatVectorProperty,
+    EnumProperty,
+    PointerProperty,
+    CollectionProperty,
+)
 
-from bpy.types import (Panel,
-                       Menu,
-                       Operator,
-                       PropertyGroup,
-                       UIList
-                       )
+from bpy.types import Panel, Menu, Operator, PropertyGroup, UIList
 
 from bpy.utils import register_class, unregister_class
 
 
 from ..scanners import hit_info
 from ..scanners import generic
+from .. import error_distribution
 
 import time
 import os
 import importlib
 import pathlib
 import random
+import copy
 from mathutils import Vector, Euler
 from math import radians
 
 import numpy as np
 import yaml
 
+
 # define location of UI panels
 class MAIN_PANEL:
-    bl_space_type = "VIEW_3D"   
+    bl_space_type = "VIEW_3D"
     bl_region_type = "UI"
     bl_category = "Scanner"
 
 
-
-
-
-
-
-############################################################# 
+#############################################################
 #                                                           #
 #                       PRESETS                             #
 #                                                           #
 #############################################################
 
+
 class WM_OT_LOAD_PRESET(Operator):
     bl_label = "Load preset"
     bl_idname = "wm.load_preset"
-    bl_description = "Loads all values for the selected scanner type into the active scanner"
+    bl_description = (
+        "Loads all values for the selected scanner type into the active scanner"
+    )
 
     @classmethod
     def poll(self, context):
@@ -72,11 +69,13 @@ class WM_OT_LOAD_PRESET(Operator):
         properties = scene.scannerProperties
 
         # Determine which scanner to load preset into based on active selection
-        is_primary = properties.activeScanner == 'primary'
+        is_primary = properties.activeScanner == "primary"
         suffix = "" if is_primary else "2"
         scanner_label = "Primary" if is_primary else "Secondary"
 
-        print(f"Loading preset for {properties.scannerName} into {scanner_label} scanner...")
+        print(
+            f"Loading preset for {properties.scannerName} into {scanner_label} scanner..."
+        )
 
         for preset in config:
             if preset["name"] != properties.scannerName:
@@ -177,7 +176,7 @@ class WM_OT_LOAD_PRESET(Operator):
                             if not ("density" in item):
                                 print("Water profile must contain density value!")
                                 continue
-                            
+
                             depth = item["depth"]
                             speed = item["speed"]
                             density = item["density"]
@@ -198,44 +197,48 @@ class WM_OT_LOAD_PRESET(Operator):
 
         return {"FINISHED"}
 
+
 def mapConfig(item):
     return (item["name"], item["name"], item["description"])
 
+
 def scannerTypeCallback(scene, context):
     # filter all scanners which belong to the category that is currently selected by scannerCategory
-    return map(lambda item: mapConfig(item), filter(lambda x: x["category"] == context.scene.scannerProperties.scannerCategory, config))
+    return map(
+        lambda item: mapConfig(item),
+        filter(
+            lambda x: x["category"] == context.scene.scannerProperties.scannerCategory,
+            config,
+        ),
+    )
+
 
 def scannerCategoryCallback(scene, context):
     return [
-        ("lidar", "Lidar", "lidar"), 
-        ("sonar", "Sonar", "sonar"), 
-        ("tof", "Time of flight", "tof")
+        ("lidar", "Lidar", "lidar"),
+        ("sonar", "Sonar", "sonar"),
+        ("tof", "Time of flight", "tof"),
     ]
+
 
 def waetherTypeCallback(scene, context):
     return [
-        ("rain", "Rain", "rain"), 
-        ("dust", "Dust", "dust"), 
+        ("rain", "Rain", "rain"),
+        ("dust", "Dust", "dust"),
     ]
 
 
-
-
-
-
-
-
-
-
-############################################################# 
+#############################################################
 #                                                           #
 #                      SCANNER SETTINGS                     #
 #                                                           #
 #############################################################
 
+
 # decide if we want to show a certain object in the selection dropdown
 def scannerObjectPoll(self, object):
-    return object.type == 'CAMERA'
+    return object.type == "CAMERA"
+
 
 # define all properties needed for all types of scanners
 class ScannerProperties(PropertyGroup):
@@ -244,7 +247,7 @@ class ScannerProperties(PropertyGroup):
         name="",
         description="Select object which should be used as scanner",
         type=bpy.types.Object,
-        poll=scannerObjectPoll
+        poll=scannerObjectPoll,
     )
 
     # Second scanner for multi-sensor fusion
@@ -252,13 +255,13 @@ class ScannerProperties(PropertyGroup):
         name="",
         description="Select second object for multi-sensor scanning (optional)",
         type=bpy.types.Object,
-        poll=scannerObjectPoll
+        poll=scannerObjectPoll,
     )
 
     joinMeshes: BoolProperty(
         name="Join static meshes",
         description="Join all static meshes in the scene",
-        default = False
+        default=False,
     )
 
     # Active scanner selector for tab-based UI
@@ -266,10 +269,10 @@ class ScannerProperties(PropertyGroup):
         name="Active Scanner",
         description="Select which scanner's settings to view and edit",
         items=[
-            ('primary', "Primary Scanner", "Configure the primary scanner"),
-            ('secondary', "Secondary Scanner", "Configure the secondary scanner"),
+            ("primary", "Primary Scanner", "Configure the primary scanner"),
+            ("secondary", "Secondary Scanner", "Configure the secondary scanner"),
         ],
-        default='primary'
+        default="primary",
     )
 
     # Scanner type for secondary scanner
@@ -279,9 +282,9 @@ class ScannerProperties(PropertyGroup):
         items=[
             (generic.ScannerType.static.name, generic.ScannerType.static.name, ""),
             (generic.ScannerType.rotating.name, generic.ScannerType.rotating.name, ""),
-            (generic.ScannerType.sideScan.name, generic.ScannerType.sideScan.name, "")
+            (generic.ScannerType.sideScan.name, generic.ScannerType.sideScan.name, ""),
         ],
-        default=generic.ScannerType.sideScan.name
+        default=generic.ScannerType.sideScan.name,
     )
 
     # ============================================================
@@ -290,280 +293,257 @@ class ScannerProperties(PropertyGroup):
 
     # Secondary scanner - common FOV settings
     fovX2: FloatProperty(
-        name = "Horizontal FOV",
-        description = "Horizontal field of view in degrees",
-        default = 90.0,
-        min = 0.0,
-        max = 360.0
+        name="Horizontal FOV",
+        description="Horizontal field of view in degrees",
+        default=90.0,
+        min=0.0,
+        max=360.0,
     )
 
     fovY2: FloatProperty(
-        name = "Vertical FOV",
-        description = "Vertical field of view in degrees",
-        default = 45,
-        min = 0.0,
-        max = 360.0
+        name="Vertical FOV",
+        description="Vertical field of view in degrees",
+        default=45,
+        min=0.0,
+        max=360.0,
     )
 
     # Secondary scanner - rotating lidar settings
     xStepDegree2: FloatProperty(
-        name = "Resolution horizontal",
-        description = "distance between scan lines (degree)",
-        default = 1.0,
-        min = 0.01,
-        max = 360.0
+        name="Resolution horizontal",
+        description="distance between scan lines (degree)",
+        default=1.0,
+        min=0.01,
+        max=360.0,
     )
 
     yStepDegree2: FloatProperty(
-        name = "Resolution vertical",
-        description = "distance between scan lines (degree)",
-        default = 1.0,
-        min = 0.01,
-        max = 180.0
+        name="Resolution vertical",
+        description="distance between scan lines (degree)",
+        default=1.0,
+        min=0.01,
+        max=180.0,
     )
 
     rotationsPerSecond2: FloatProperty(
-        name = "Rotations per second",
-        description = "Number of rotations the sensor performs in one second",
-        default = 10.0,
-        min = 0.01,
-        max = 1000.0
+        name="Rotations per second",
+        description="Number of rotations the sensor performs in one second",
+        default=10.0,
+        min=0.01,
+        max=1000.0,
     )
 
     # Secondary scanner - static lidar settings
     resolutionX2: IntProperty(
-        name = "Width",
-        description = "Number of pixels in x direction",
-        default = 320,
-        min = 1,
-        max = 1000000
+        name="Width",
+        description="Number of pixels in x direction",
+        default=320,
+        min=1,
+        max=1000000,
     )
 
     resolutionY2: IntProperty(
-        name = "Height",
-        description = "Number of pixels in y direction",
-        default = 240,
-        min = 1,
-        max = 1000000,
+        name="Height",
+        description="Number of pixels in y direction",
+        default=240,
+        min=1,
+        max=1000000,
     )
 
     resolutionPercentage2: IntProperty(
-        name = "Scale",
-        description = "Percentage to scale the resolution",
-        default = 100,
-        min = 1,
-        max = 100000
+        name="Scale",
+        description="Percentage to scale the resolution",
+        default=100,
+        min=1,
+        max=100000,
     )
 
     # Secondary scanner - sonar settings
     fovSonar2: FloatProperty(
-        name = "FOV down",
-        description = "Downwards field of view in degrees",
-        default = 45.0,
-        min = 0.0,
-        max = 180.0
+        name="FOV down",
+        description="Downwards field of view in degrees",
+        default=45.0,
+        min=0.0,
+        max=180.0,
     )
 
     sonarStepDegree2: FloatProperty(
-        name = "Scan resolution",
-        description = "distance between scan lines (degree)",
-        default = 1.0,
-        min = 0.01,
-        max = 180.0
+        name="Scan resolution",
+        description="distance between scan lines (degree)",
+        default=1.0,
+        min=0.01,
+        max=180.0,
     )
 
     sonarMode3D2: BoolProperty(
-        name="3D Mode",
-        description="Enable or disable 3D data points",
-        default = False
+        name="3D Mode", description="Enable or disable 3D data points", default=False
     )
 
     sonarKeepRotation2: BoolProperty(
         name="Use sensor rotation",
         description="Decide if point slices should be perpendicular to sensor movement or aligned in one direction",
-        default = False
+        default=False,
     )
 
     sourceLevel2: FloatProperty(
-        name = "Source level",
-        description = "The signals source level in dB",
-        default = 200.0,
-        min = 0.01,
-        max = 10000.0
+        name="Source level",
+        description="The signals source level in dB",
+        default=200.0,
+        min=0.01,
+        max=10000.0,
     )
 
     noiseLevel2: FloatProperty(
-        name = "Noise level",
-        description = "The noise level in dB",
-        default = 50.0,
-        min = 0.01,
-        max = 10000.0
+        name="Noise level",
+        description="The noise level in dB",
+        default=50.0,
+        min=0.01,
+        max=10000.0,
     )
 
     directivityIndex2: FloatProperty(
-        name = "Directivity index",
-        description = "The directivity index in dB",
-        default = 20.0,
-        min = 0.01,
-        max = 10000.0
+        name="Directivity index",
+        description="The directivity index in dB",
+        default=20.0,
+        min=0.01,
+        max=10000.0,
     )
 
     processingGain2: FloatProperty(
-        name = "Processing gain",
-        description = "The processing gain in dB",
-        default = 10.0,
-        min = 0.01,
-        max = 10000.0
+        name="Processing gain",
+        description="The processing gain in dB",
+        default=10.0,
+        min=0.01,
+        max=10000.0,
     )
 
     receptionThreshold2: FloatProperty(
-        name = "Reception threshold",
-        description = "The reception threshold in dB",
-        default = 10.0,
-        min = 0.01,
-        max = 10000.0
+        name="Reception threshold",
+        description="The reception threshold in dB",
+        default=10.0,
+        min=0.01,
+        max=10000.0,
     )
 
     maxDistance2: FloatProperty(
-        name="Maximum distance",
-        description="",
-        default = 100.0,
-        min = 0.01,
-        max = 10000.0
+        name="Maximum distance", description="", default=100.0, min=0.01, max=10000.0
     )
 
     simulateWaterProfile2: BoolProperty(
         name="Simulate water profile",
         description="Enable or disable simulation of the water profile for the secondary scanner",
-        default = False
+        default=False,
     )
 
     surfaceHeight2: FloatProperty(
-        name="Water surface level", 
+        name="Water surface level",
         description="The height of the water surface for the secondary scanner",
-        default = 10.0
+        default=10.0,
     )
 
     # PRESETS
     scannerCategory: EnumProperty(
         name="Scanner category",
         description="Select scanner type",
-        items=scannerCategoryCallback, # https://blender.stackexchange.com/a/10919/95167
+        items=scannerCategoryCallback,  # https://blender.stackexchange.com/a/10919/95167
     )
 
     scannerName: EnumProperty(
         name="Scanner",
         description="Select scanner",
-        items=scannerTypeCallback, # https://blender.stackexchange.com/a/10919/95167
+        items=scannerTypeCallback,  # https://blender.stackexchange.com/a/10919/95167
     )
-
-
-
-
 
     # REFLECTIVITY
     reflectivityLower: FloatProperty(
-        name = "Lower reflectivity",
-        description = "minimum angle (degree)",
-        default = 0.1,
-        min = 0.0,
-        max = 1.0
+        name="Lower reflectivity",
+        description="minimum angle (degree)",
+        default=0.1,
+        min=0.0,
+        max=1.0,
     )
 
     distanceLower: FloatProperty(
-        name = "Lower distance",
-        description = "minimum angle (degree)",
-        default = 50.0,
-        min = 0,
-        max = 99999
+        name="Lower distance",
+        description="minimum angle (degree)",
+        default=50.0,
+        min=0,
+        max=99999,
     )
 
     reflectivityUpper: FloatProperty(
-        name = "Upper reflectivity",
-        description = "minimum angle (degree)",
-        default = 0.9,
-        min = 0.0,
-        max = 1.0
+        name="Upper reflectivity",
+        description="minimum angle (degree)",
+        default=0.9,
+        min=0.0,
+        max=1.0,
     )
 
     distanceUpper: FloatProperty(
-        name = "Upper distance",
-        description = "minimum angle (degree)",
-        default = 120,
-        min = 0,
-        max = 999999
+        name="Upper distance",
+        description="minimum angle (degree)",
+        default=120,
+        min=0,
+        max=999999,
     )
 
     maxReflectionDepth: IntProperty(
-        name = "Maximum reflection depth",
-        description = "The maximum number of reflections before a ray is discarded",
-        default = 10,
-        min = 0,
-        max = 1000
+        name="Maximum reflection depth",
+        description="The maximum number of reflections before a ray is discarded",
+        default=10,
+        min=0,
+        max=1000,
     )
-
-
-
-
 
     # SCANNER
     fovX: FloatProperty(
-        name = "Horizontal FOV",
-        description = "Horizontal field of view in degrees",
-        default = 90.0,
-        min = 0.0,
-        max = 360.0
+        name="Horizontal FOV",
+        description="Horizontal field of view in degrees",
+        default=90.0,
+        min=0.0,
+        max=360.0,
     )
 
     fovY: FloatProperty(
-        name = "Vertical FOV",
-        description = "Vertical field of view in degrees",
-        default = 45,
-        min = 0.0,
-        max = 360.0
+        name="Vertical FOV",
+        description="Vertical field of view in degrees",
+        default=45,
+        min=0.0,
+        max=360.0,
     )
-
-
-
 
     # ANIMATION
     enableAnimation: BoolProperty(
         name="Enable animation",
         description="Enable or disable the calculation for multiple frames",
-        default = False
+        default=False,
     )
 
     frameStart: IntProperty(
-        name = "Frame start",
-        description = "The first frame to be rendered",
-        default = 1,
+        name="Frame start",
+        description="The first frame to be rendered",
+        default=1,
     )
 
     frameEnd: IntProperty(
-        name = "Frame end",
-        description = "The last frame to be rendered",
-        default = 10
+        name="Frame end", description="The last frame to be rendered", default=10
     )
 
     frameStep: IntProperty(
-        name = "Frame step",
-        description = "Number of frames to skip",
-        default = 1,
+        name="Frame step",
+        description="Number of frames to skip",
+        default=1,
     )
 
     frameRate: FloatProperty(
-        name = "Frame rate",
-        description = "Frames per second",
-        default = 24.0,
+        name="Frame rate",
+        description="Frames per second",
+        default=24.0,
     )
-
-
-
-
 
     # OBJECT MODIFICATION
     swapObject: PointerProperty(
-        name="", 
+        name="",
         description="Select object which should be swapped out",
         type=bpy.types.Object,
     )
@@ -571,251 +551,239 @@ class ScannerProperties(PropertyGroup):
     enableSwapping: BoolProperty(
         name="Enable swapping",
         description="Enable or disable replacing the selected object with different models",
-        default = False
+        default=False,
     )
 
-    modelsFilePath : StringProperty(
+    modelsFilePath: StringProperty(
         name="Models location",
         description="Path to directory of models (.obj)",
         default="",
         maxlen=2048,
-        subtype='DIR_PATH'
+        subtype="DIR_PATH",
     )
 
     enableModification: BoolProperty(
         name="Enable random modification",
         description="Enable or disable modification of the selected object",
-        default = False
+        default=False,
     )
 
     numberOfModifications: IntProperty(
-        name = "Number of modifications",
-        description = "The number of modifications applied to the object",
-        default = 1,
-        min = 0,
-        max = 10000
+        name="Number of modifications",
+        description="The number of modifications applied to the object",
+        default=1,
+        min=0,
+        max=10000,
     )
 
     minTransX: FloatProperty(
-        name = "Lower bound X",
-        description = "Lower deviation bound of translation on the X axis",
-        default = -1.0,
-        min = -10000.0,
-        max = 0.0
+        name="Lower bound X",
+        description="Lower deviation bound of translation on the X axis",
+        default=-1.0,
+        min=-10000.0,
+        max=0.0,
     )
 
     maxTransX: FloatProperty(
-        name = "Upper bound X",
-        description = "Upper deviation bound of translation on the X axis",
-        default = 1.0,
-        min = 0.0,
-        max = 10000.0
+        name="Upper bound X",
+        description="Upper deviation bound of translation on the X axis",
+        default=1.0,
+        min=0.0,
+        max=10000.0,
     )
 
     minTransY: FloatProperty(
-        name = "Lower bound Y",
-        description = "Lower deviation bound of translation on the Y axis",
-        default = -1.0,
-        min = -10000.0,
-        max = 0.0
+        name="Lower bound Y",
+        description="Lower deviation bound of translation on the Y axis",
+        default=-1.0,
+        min=-10000.0,
+        max=0.0,
     )
 
     maxTransY: FloatProperty(
-        name = "Upper bound Y",
-        description = "Upper deviation bound of translation on the Y axis",
-        default = 1.0,
-        min = 0.0,
-        max = 10000.0
+        name="Upper bound Y",
+        description="Upper deviation bound of translation on the Y axis",
+        default=1.0,
+        min=0.0,
+        max=10000.0,
     )
 
     minTransZ: FloatProperty(
-        name = "Lower bound Z",
-        description = "Lower deviation bound of translation on the Z axis",
-        default = -1.0,
-        min = -10000.0,
-        max = 0.0
+        name="Lower bound Z",
+        description="Lower deviation bound of translation on the Z axis",
+        default=-1.0,
+        min=-10000.0,
+        max=0.0,
     )
 
     maxTransZ: FloatProperty(
-        name = "Upper bound Z",
-        description = "Upper deviation bound of translation on the Z axis",
-        default = 1.0,
-        min = 0.0,
-        max = 10000.0
+        name="Upper bound Z",
+        description="Upper deviation bound of translation on the Z axis",
+        default=1.0,
+        min=0.0,
+        max=10000.0,
     )
 
-
     minRotX: FloatProperty(
-        name = "Lower bound X",
-        description = "Lower deviation bound of rotation around the X axis in degree",
-        default = -5.0,
-        min = -10000.0,
-        max = 0.0
+        name="Lower bound X",
+        description="Lower deviation bound of rotation around the X axis in degree",
+        default=-5.0,
+        min=-10000.0,
+        max=0.0,
     )
 
     maxRotX: FloatProperty(
-        name = "Upper bound X",
-        description = "Upper deviation bound of rotation around the X axis in degree",
-        default = 5.0,
-        min = 0.0,
-        max = 10000.0
+        name="Upper bound X",
+        description="Upper deviation bound of rotation around the X axis in degree",
+        default=5.0,
+        min=0.0,
+        max=10000.0,
     )
 
     minRotY: FloatProperty(
-        name = "Lower bound Y",
-        description = "Lower deviation bound of rotation around the Y axis in degree",
-        default = -5.0,
-        min = -10000.0,
-        max = 0.0
+        name="Lower bound Y",
+        description="Lower deviation bound of rotation around the Y axis in degree",
+        default=-5.0,
+        min=-10000.0,
+        max=0.0,
     )
 
     maxRotY: FloatProperty(
-        name = "Upper bound Y",
-        description = "Upper deviation bound of rotation around the Y axis in degree",
-        default = 5.0,
-        min = 0.0,
-        max = 10000.0
+        name="Upper bound Y",
+        description="Upper deviation bound of rotation around the Y axis in degree",
+        default=5.0,
+        min=0.0,
+        max=10000.0,
     )
 
     minRotZ: FloatProperty(
-        name = "Lower bound Z",
-        description = "Lower deviation bound of rotation around the Z axis in degree",
-        default = -5.0,
-        min = -10000.0,
-        max = 0.0
+        name="Lower bound Z",
+        description="Lower deviation bound of rotation around the Z axis in degree",
+        default=-5.0,
+        min=-10000.0,
+        max=0.0,
     )
 
     maxRotZ: FloatProperty(
-        name = "Upper bound Z",
-        description = "Upper deviation bound of rotation around the Z axis in degree",
-        default = 5.0,
-        min = 0.0,
-        max = 10000.0
+        name="Upper bound Z",
+        description="Upper deviation bound of rotation around the Z axis in degree",
+        default=5.0,
+        min=0.0,
+        max=10000.0,
     )
-
-
 
     uniformScaling: BoolProperty(
         name="Enable uniform scaling",
         description="Enable or disable if all axes should be equally scaled",
-        default = True
+        default=True,
     )
 
     minScaleAll: FloatProperty(
-        name = "Lower bound",
-        description = "Lower deviation bound of scale on the X axis",
-        default = 0.9,
-        min = 0.0,
-        max = 1.0
+        name="Lower bound",
+        description="Lower deviation bound of scale on the X axis",
+        default=0.9,
+        min=0.0,
+        max=1.0,
     )
 
     maxScaleAll: FloatProperty(
-        name = "Upper bound",
-        description = "Upper deviation bound of scale on the X axis",
-        default = 1.1,
-        min = 1.0,
-        max = 10000.0
+        name="Upper bound",
+        description="Upper deviation bound of scale on the X axis",
+        default=1.1,
+        min=1.0,
+        max=10000.0,
     )
 
     minScaleX: FloatProperty(
-        name = "Lower bound X",
-        description = "Lower deviation bound of scale on the X axis",
-        default = 0.9,
-        min = 0.0,
-        max = 1.0
+        name="Lower bound X",
+        description="Lower deviation bound of scale on the X axis",
+        default=0.9,
+        min=0.0,
+        max=1.0,
     )
 
     maxScaleX: FloatProperty(
-        name = "Upper bound X",
-        description = "Upper deviation bound of scale on the X axis",
-        default = 1.1,
-        min = 1.0,
-        max = 10000.0
+        name="Upper bound X",
+        description="Upper deviation bound of scale on the X axis",
+        default=1.1,
+        min=1.0,
+        max=10000.0,
     )
 
     minScaleY: FloatProperty(
-        name = "Lower bound Y",
-        description = "Lower deviation bound of scale on the Y axis",
-        default = 0.9,
-        min = 0.0,
-        max = 1.0
+        name="Lower bound Y",
+        description="Lower deviation bound of scale on the Y axis",
+        default=0.9,
+        min=0.0,
+        max=1.0,
     )
 
     maxScaleY: FloatProperty(
-        name = "Upper bound Y",
-        description = "Upper deviation bound of scale on the Y axis",
-        default = 1.1,
-        min = 1.0,
-        max = 10000.0
+        name="Upper bound Y",
+        description="Upper deviation bound of scale on the Y axis",
+        default=1.1,
+        min=1.0,
+        max=10000.0,
     )
 
     minScaleZ: FloatProperty(
-        name = "Lower bound Z",
-        description = "Lower deviation bound of scale on the Z axis",
-        default = 0.9,
-        min = 0.0,
-        max = 1.0
+        name="Lower bound Z",
+        description="Lower deviation bound of scale on the Z axis",
+        default=0.9,
+        min=0.0,
+        max=1.0,
     )
 
     maxScaleZ: FloatProperty(
-        name = "Upper bound Z",
-        description = "Upper deviation bound of scale on the Z axis",
-        default = 1.1,
-        min = 1.0,
-        max = 10000.0
+        name="Upper bound Z",
+        description="Upper deviation bound of scale on the Z axis",
+        default=1.1,
+        min=1.0,
+        max=10000.0,
     )
-
-
-
-
 
     # NOISE
     addNoise: BoolProperty(
-        name="Add noise",
-        description="Enable or disable noise",
-        default = True
+        name="Add noise", description="Enable or disable noise", default=True
     )
 
     noiseType: EnumProperty(
         name="Noise type",
         description="Select noise type",
-        items=[ ('gaussian', "Gaussian", ""),
-        ]
+        items=[
+            ("gaussian", "Gaussian", ""),
+        ],
     )
 
     mu: FloatProperty(
-        name = "Mean",
-        description = "Mean",
-        default = 0.0,
+        name="Mean",
+        description="Mean",
+        default=0.0,
     )
 
     sigma: FloatProperty(
-        name = "Standard deviation",
-        description = "Standard deviation",
-        default = 0.01,
+        name="Standard deviation",
+        description="Standard deviation",
+        default=0.01,
     )
-
 
     addConstantNoise: BoolProperty(
         name="Add constant offset",
         description="Enable or disable constant offset",
-        default = True
+        default=True,
     )
 
     noiseAbsoluteOffset: FloatProperty(
-        name = "Absolute offset (meter)",
-        description = "A constant absolute offset (in meter) which is added on every measurement",
-        default = 0.0,
+        name="Absolute offset (meter)",
+        description="A constant absolute offset (in meter) which is added on every measurement",
+        default=0.0,
     )
 
     noiseRelativeOffset: FloatProperty(
-        name = "Relative offset (percent)",
-        description = "A constant relative offset (in percent) which is added on every measurement",
-        default = 0.0,
+        name="Relative offset (percent)",
+        description="A constant relative offset (in percent) which is added on every measurement",
+        default=0.0,
     )
-
-
-
 
     # WEATHER
     weatherType: EnumProperty(
@@ -828,207 +796,194 @@ class ScannerProperties(PropertyGroup):
     simulateRain: BoolProperty(
         name="Simulate Rain",
         description="Enable or disable rain simulation",
-        default = False
+        default=False,
     )
 
     rainfallRate: FloatProperty(
-        name = "Rainfall rate (mm/h)",
-        description = "Rainfall rate in mm/h",
-        default = 10.0,
-        min = 0.0
+        name="Rainfall rate (mm/h)",
+        description="Rainfall rate in mm/h",
+        default=10.0,
+        min=0.0,
     )
 
     # DUST
     simulateDust: BoolProperty(
         name="Simulate dust",
         description="Enable or disable dust simulation",
-        default = False
+        default=False,
     )
 
     particleRadius: FloatProperty(
-        name = "Particle radius (µm)",
-        description = "Particle radius in microns",
-        default = 50.0,
-        min = 0.0,
-        max = 100000.0
+        name="Particle radius (µm)",
+        description="Particle radius in microns",
+        default=50.0,
+        min=0.0,
+        max=100000.0,
     )
 
     particlesPcm: FloatProperty(
-        name = "Particle density (pcm)",
-        description = "Particles per cubic meter",
-        default = 100000.0,
-        min = 0.0,
-        max = 1000000000.0
+        name="Particle density (pcm)",
+        description="Particles per cubic meter",
+        default=100000.0,
+        min=0.0,
+        max=1000000000.0,
     )
 
     dustCloudStart: FloatProperty(
-        name = "Distance (m)",
-        description = "Distance between sensor and dust cloud in meter",
-        default = 5.0,
-        min = 0.0,
-        max = 1000000000.0
-    ) 
+        name="Distance (m)",
+        description="Distance between sensor and dust cloud in meter",
+        default=5.0,
+        min=0.0,
+        max=1000000000.0,
+    )
 
     dustCloudLength: FloatProperty(
-        name = "Length (m)",
-        description = "Length of dust cloud in meter",
-        default = 12.5,
-        min = 0.0,
-        max = 1000000.0
-    ) 
-
-
-
-
+        name="Length (m)",
+        description="Length of dust cloud in meter",
+        default=12.5,
+        min=0.0,
+        max=1000000.0,
+    )
 
     # VISUALIZATION
     addMesh: BoolProperty(
         name="Add datapoint mesh",
         description="Enable or disable if a single mesh of points should be added for all measurements",
-        default = True
-    ) 
-
-
-
-
+        default=True,
+    )
 
     # EXPORT
     exportLAS: BoolProperty(
         name="Export .las file",
         description="Enable or disable if data should be saved into .las file format",
-        default = False
-    ) 
+        default=False,
+    )
 
     exportHDF: BoolProperty(
         name="Export .hdf file",
         description="Enable or disable if data should be saved into .hdf file format",
-        default = False
-    ) 
+        default=False,
+    )
 
     exportCSV: BoolProperty(
         name="Export .csv file",
         description="Enable or disable if data should be saved into .csv file format",
-        default = False
+        default=False,
     )
 
     exportPLY: BoolProperty(
         name="Export .ply file",
         description="Enable or disable if data should be saved into .ply file format",
-        default=False
+        default=False,
     )
 
     exportSingleFrames: BoolProperty(
         name="Export single frames",
         description="If enabled, each frame of the animation is saved as separate dataset. If disabled, all frames are merged into one dataset",
-        default = False
-    ) 
+        default=False,
+    )
 
-    dataFilePath : StringProperty(
+    dataFilePath: StringProperty(
         name="Directory",
         description="Path to Directory",
         default="",
         maxlen=2048,
-        subtype='DIR_PATH'
+        subtype="DIR_PATH",
     )
 
-    dataFileName : StringProperty(
+    dataFileName: StringProperty(
         name="File name",
         description="File name (without extension!)",
         default="",
         maxlen=2048,
-        subtype='FILE_NAME'
+        subtype="FILE_NAME",
     )
 
     exportRenderedImage: BoolProperty(
         name="Export rendered image",
         description="Enable or disable if scene should be rendered",
-        default = False
-    ) 
+        default=False,
+    )
 
     exportSegmentedImage: BoolProperty(
         name="Export segmented image",
         description="Enable or disable if data should be visualized as segmented image",
-        default = False
-    ) 
+        default=False,
+    )
 
     exportPascalVoc: BoolProperty(
         name="Export pascal voc",
         description="Enable or disable if data should be exported as .xml in the pascal voc format",
-        default = False
+        default=False,
     )
 
     exportDepthmap: BoolProperty(
         name="Export depthmap",
         description="Enable or disable if data should be visualized as depthmap",
-        default = False
+        default=False,
     )
 
     depthMinDistance: FloatProperty(
-        name = "Minimum",
-        description = "Minimum distance (white)",
-        default = 0.0,
-        min = 0.0,
+        name="Minimum",
+        description="Minimum distance (white)",
+        default=0.0,
+        min=0.0,
     )
 
     depthMaxDistance: FloatProperty(
-        name = "Maximum",
-        description = "Maximum distance (black)",
-        default = 50.0,
-        min = 0.0,
+        name="Maximum",
+        description="Maximum distance (black)",
+        default=50.0,
+        min=0.0,
     )
 
-
-    imageFilePath : StringProperty(
+    imageFilePath: StringProperty(
         name="Save location",
         description="Path to Directory",
         default="",
         maxlen=2048,
-        subtype='DIR_PATH'
+        subtype="DIR_PATH",
     )
-
-
-
-
 
     # DEBUG
     debugLines: BoolProperty(
         name="Debug lines",
         description="Enable or disable scanner lines (WARNING: can be very slow)",
-        default = False
+        default=False,
     )
 
     debugOutput: BoolProperty(
         name="Debug output",
         description="Enable or disable additional output (WARNING: can be very slow)",
-        default = False
+        default=False,
     )
 
     outputProgress: BoolProperty(
         name="Output progress",
         description="Enable or disable progress output (WARNING: can be very slow)",
-        default = False
+        default=False,
     )
 
     measureTime: BoolProperty(
         name="Measure time",
         description="Enable or disable time measurement",
-        default = False
+        default=False,
     )
 
     singleRay: BoolProperty(
         name="Single ray",
         description="Enable or disable if only a single ray should be fired towards 'dest' object",
-        default = False
+        default=False,
     )
 
     destinationObject: PointerProperty(
-        name="", 
+        name="",
         description="Select destination object which should be used to calculate the ray direction",
         type=bpy.types.Object,
     )
 
     targetObject: PointerProperty(
-        name="", 
+        name="",
         description="Select target object which the ray should hit",
         type=bpy.types.Object,
     )
@@ -1038,13 +993,12 @@ class ScannerProperties(PropertyGroup):
         description="Select scanner type",
         items=[
             (generic.ScannerType.static.name, generic.ScannerType.static.name, ""),
-            (generic.ScannerType.rotating.name, generic.ScannerType.rotating.name, ""), 
-            (generic.ScannerType.sideScan.name, generic.ScannerType.sideScan.name, "") 
-         ],
+            (generic.ScannerType.rotating.name, generic.ScannerType.rotating.name, ""),
+            (generic.ScannerType.sideScan.name, generic.ScannerType.sideScan.name, ""),
+        ],
     )
 
-
-    ############################################################# 
+    #############################################################
     #                                                           #
     #               ROTATING SCANNER SETTINGS                   #
     #                                                           #
@@ -1052,31 +1006,30 @@ class ScannerProperties(PropertyGroup):
 
     # SCANNER
     xStepDegree: FloatProperty(
-        name = "Resolution horizontal",
-        description = "distance between scan lines (degree)",
-        default = 1.0,
-        min = 0.01,
-        max = 360.0
+        name="Resolution horizontal",
+        description="distance between scan lines (degree)",
+        default=1.0,
+        min=0.01,
+        max=360.0,
     )
-        
+
     yStepDegree: FloatProperty(
-        name = "Resolution vertical",
-        description = "distance between scan lines (degree)",
-        default = 1.0,
-        min = 0.01,
-        max = 180.0
+        name="Resolution vertical",
+        description="distance between scan lines (degree)",
+        default=1.0,
+        min=0.01,
+        max=180.0,
     )
 
     rotationsPerSecond: FloatProperty(
-        name = "Rotations per second",
-        description = "Number of rotations the sensor performs in one second",
-        default = 10.0,
-        min = 0.01,
-        max = 1000.0
+        name="Rotations per second",
+        description="Number of rotations the sensor performs in one second",
+        default=10.0,
+        min=0.01,
+        max=1000.0,
     )
 
-
-    ############################################################# 
+    #############################################################
     #                                                           #
     #                STATIC SCANNER SETTINGS                    #
     #                                                           #
@@ -1084,161 +1037,148 @@ class ScannerProperties(PropertyGroup):
 
     # CAMERA
     resolutionX: IntProperty(
-        name = "Width",
-        description = "Number of pixels in x direction",
-        default = 320,
-        min = 1,
-        max = 1000000
+        name="Width",
+        description="Number of pixels in x direction",
+        default=320,
+        min=1,
+        max=1000000,
     )
 
     resolutionY: IntProperty(
-        name = "Height",
-        description = "Number of pixels in y direction",
-        default = 240,
-        min = 1,
-        max = 1000000,
+        name="Height",
+        description="Number of pixels in y direction",
+        default=240,
+        min=1,
+        max=1000000,
     )
-    
+
     resolutionPercentage: IntProperty(
-        name = "Scale",
-        description = "Percentage to scale the resolution",
-        default = 100,
-        min = 1,
-        max = 100000
+        name="Scale",
+        description="Percentage to scale the resolution",
+        default=100,
+        min=1,
+        max=100000,
     )
 
-
-    ############################################################# 
+    #############################################################
     #                                                           #
     #                      SONAR SETTINGS                       #
     #                                                           #
     #############################################################
 
-
-    
     fovSonar: FloatProperty(
-        name = "FOV down",
-        description = "Downwards field of view in degrees",
-        default = 45.0,
-        min = 0.0,
-        max = 180.0
+        name="FOV down",
+        description="Downwards field of view in degrees",
+        default=45.0,
+        min=0.0,
+        max=180.0,
     )
 
-
     sonarStepDegree: FloatProperty(
-        name = "Scan resolution",
-        description = "distance between scan lines (degree)",
-        default = 1.0,
-        min = 0.01,
-        max = 180.0
+        name="Scan resolution",
+        description="distance between scan lines (degree)",
+        default=1.0,
+        min=0.01,
+        max=180.0,
     )
 
     sonarMode3D: BoolProperty(
-        name="3D Mode",
-        description="Enable or disable 3D data points",
-        default = False
+        name="3D Mode", description="Enable or disable 3D data points", default=False
     )
 
     sonarKeepRotation: BoolProperty(
         name="Use sensor rotation",
         description="Decide if point slices should be perpendicular to sensor movement or aligned in one direction",
-        default = False
+        default=False,
     )
-
 
     # default values taken from this example: https://dosits.org/science/advanced-topics/sonar-equation/sonar-equation-example-active-sonar/
     sourceLevel: FloatProperty(
-        name = "Source level",
-        description = "The signals source level in dB",
-        default = 200.0,
-        min = 0.01,
-        max = 10000.0
+        name="Source level",
+        description="The signals source level in dB",
+        default=200.0,
+        min=0.01,
+        max=10000.0,
     )
 
     noiseLevel: FloatProperty(
-        name = "Noise level",
-        description = "The noise level in dB",
-        default = 50.0,
-        min = 0.01,
-        max = 10000.0
+        name="Noise level",
+        description="The noise level in dB",
+        default=50.0,
+        min=0.01,
+        max=10000.0,
     )
 
     directivityIndex: FloatProperty(
-        name = "Directivity index",
-        description = "The directivity index in dB",
-        default = 20.0,
-        min = 0.01,
-        max = 10000.0
+        name="Directivity index",
+        description="The directivity index in dB",
+        default=20.0,
+        min=0.01,
+        max=10000.0,
     )
 
     processingGain: FloatProperty(
-        name = "Processing gain",
-        description = "The processing gain in dB",
-        default = 10.0,
-        min = 0.01,
-        max = 10000.0
+        name="Processing gain",
+        description="The processing gain in dB",
+        default=10.0,
+        min=0.01,
+        max=10000.0,
     )
 
     receptionThreshold: FloatProperty(
-        name = "Reception threshold",
-        description = "The reception threshold in dB",
-        default = 10.0,
-        min = 0.01,
-        max = 10000.0
+        name="Reception threshold",
+        description="The reception threshold in dB",
+        default=10.0,
+        min=0.01,
+        max=10000.0,
     )
 
     maxDistance: FloatProperty(
-        name="Maximum distance", 
-        description="",
-        default = 100.0,
-        min = 0.01,
-        max = 10000.0
+        name="Maximum distance", description="", default=100.0, min=0.01, max=10000.0
     )
 
     simulateWaterProfile: BoolProperty(
         name="Simulate water profile",
         description="Enable or disable simulation of the water profile",
-        default = False
+        default=False,
     )
 
     surfaceHeight: FloatProperty(
-        name="Water surface level", 
+        name="Water surface level",
         description="The height of the water surface in the scene",
-        default = 10.0
+        default=10.0,
     )
 
     refractionDepth: FloatProperty(
-        name="Water depth", 
+        name="Water depth",
         description="The lower depth of the water layer with the given refractive index",
     )
 
     refractionSpeed: FloatProperty(
-        name="Speed", 
+        name="Speed",
         description="The propagation speed of the wave in the current water layer (m/s",
     )
 
     refractionDensity: FloatProperty(
-        name="Density", 
+        name="Density",
         description="The density of the current water layer (kg/m³)",
     )
 
 
-
-
-
-
-
-############################################################# 
+#############################################################
 #                                                           #
 #                      USER INTERFACE                       #
 #                                                           #
 #############################################################
 
+
 def modifyAndScan(context, properties, objectName):
     # random modifications enabled
     if properties.enableModification:
         # store the objects pose as default
-        matrixWorld = properties.swapObject.matrix_world.copy() # use copy or the variable itself is also changed
+        matrixWorld = (
+            properties.swapObject.matrix_world.copy()
+        )  # use copy or the variable itself is also changed
         matrixWorldDecomposed = matrixWorld.decompose()
         oldLocation = matrixWorldDecomposed[0]
         oldRotation = matrixWorldDecomposed[1].to_euler()
@@ -1252,18 +1192,29 @@ def modifyAndScan(context, properties, objectName):
             transZ = random.uniform(properties.minTransZ, properties.maxTransZ)
 
             # add the values
-            properties.swapObject.location = oldLocation + Vector((transX, transY, transZ))
-            
+            properties.swapObject.location = oldLocation + Vector(
+                (transX, transY, transZ)
+            )
+
             rotX = random.uniform(properties.minRotX, properties.maxRotX)
             rotY = random.uniform(properties.minRotY, properties.maxRotY)
             rotZ = random.uniform(properties.minRotZ, properties.maxRotZ)
 
-            properties.swapObject.rotation_mode = 'XYZ'
-            properties.swapObject.rotation_euler = Euler((oldRotation[0] + radians(rotX), oldRotation[1] + radians(rotY), oldRotation[2] + radians(rotZ)), 'XYZ')
+            properties.swapObject.rotation_mode = "XYZ"
+            properties.swapObject.rotation_euler = Euler(
+                (
+                    oldRotation[0] + radians(rotX),
+                    oldRotation[1] + radians(rotY),
+                    oldRotation[2] + radians(rotZ),
+                ),
+                "XYZ",
+            )
 
             # if uniform sclaing is enabled, all values should be scaled the same
             if properties.uniformScaling:
-                scaleAll = random.uniform(properties.minScaleAll, properties.maxScaleAll)
+                scaleAll = random.uniform(
+                    properties.minScaleAll, properties.maxScaleAll
+                )
                 properties.swapObject.scale[0] = oldScale[0] * scaleAll
                 properties.swapObject.scale[1] = oldScale[1] * scaleAll
                 properties.swapObject.scale[2] = oldScale[2] * scaleAll
@@ -1282,6 +1233,7 @@ def modifyAndScan(context, properties, objectName):
     else:
         generic.startScan(context, properties, objectName)
 
+
 def performScan(context, properties):
     if properties.joinMeshes:
         # for large groups of objects it seems to be a good idea to join them into one
@@ -1290,19 +1242,29 @@ def performScan(context, properties):
 
         # get all meshes, but exclude animated objects and the swap object as they are
         # modified during the simulation
-        targets = list(filter(lambda x: x.type == 'MESH' and # object has some kind of geometry
-                                        x != properties.swapObject and # exclude swap object
-                                        (x.animation_data == None or x.animation_data.action == None) and # exclude animated objects
-                                        x.hide_get() == False and # exclude hidden objects
-                                        x.active_material != None and # only consider targets with a material set
-                                        'categoryID' not in x and 'partID' not in x # exclude objects with semantic mappings
-        , bpy.context.scene.objects))
+        targets = list(
+            filter(
+                lambda x: (
+                    x.type == "MESH"  # object has some kind of geometry
+                    and x != properties.swapObject  # exclude swap object
+                    and (
+                        x.animation_data == None or x.animation_data.action == None
+                    )  # exclude animated objects
+                    and x.hide_get() == False  # exclude hidden objects
+                    and x.active_material
+                    != None  # only consider targets with a material set
+                    and "categoryID" not in x
+                    and "partID" not in x
+                ),  # exclude objects with semantic mappings
+                bpy.context.scene.objects,
+            )
+        )
 
         if len(targets) > 1:
             # the following block joins all objects so that there is only one BVHTree for all of them
             # this leads to some perfomance improvement, but needs more memory as objects are stored
             # multiple times instead of using instances
-            bpy.ops.object.select_all(action='DESELECT')
+            bpy.ops.object.select_all(action="DESELECT")
 
             for target in targets:
                 target.select_set(True)
@@ -1310,7 +1272,7 @@ def performScan(context, properties):
             context.view_layer.objects.active = targets[0]
 
             print("Joining %d meshes..." % len(targets))
-            
+
             bpy.ops.object.join()
 
             print("Done.")
@@ -1324,30 +1286,35 @@ def performScan(context, properties):
 
         for path, _, files in os.walk(absolutePath):
             for name in files:
-                if name.endswith(".fbx") or name.endswith(".gltf") or name.endswith(".glb") or name.endswith(".obj"): # or name.endswith(".x3d") or name.endswith(".wrl"):
+                if (
+                    name.endswith(".fbx")
+                    or name.endswith(".gltf")
+                    or name.endswith(".glb")
+                    or name.endswith(".obj")
+                ):  # or name.endswith(".x3d") or name.endswith(".wrl"):
                     # get the full path wich is used to load the obj file
                     fullPath = os.path.join(path, name)
 
                     # get the relative path inside the chosen directory to use it as unique name for the output file
                     relativePath = os.path.relpath(fullPath, absolutePath)
-                    
+
                     filePaths.append((fullPath, relativePath))
-                    
+
                     print("Found file: ", fullPath)
-                    
-        for (currentFile, fileName) in filePaths:
+
+        for currentFile, fileName in filePaths:
             print("Loading model %s" % currentFile)
 
             # import file
-            if fileName.endswith(".glb") or fileName.endswith(".gltf") :
+            if fileName.endswith(".glb") or fileName.endswith(".gltf"):
                 bpy.ops.import_scene.gltf(filepath=currentFile)
                 bpy.context.active_object.select_set(True)
 
-            else:   
+            else:
                 if fileName.endswith(".fbx"):
                     bpy.ops.import_scene.fbx(filepath=currentFile)
 
-                if fileName.endswith(".glb") or fileName.endswith(".gltf") :
+                if fileName.endswith(".glb") or fileName.endswith(".gltf"):
                     bpy.ops.import_scene.gltf(filepath=currentFile)
 
                 if fileName.endswith(".obj"):
@@ -1355,13 +1322,13 @@ def performScan(context, properties):
 
                 # the .x3d format importer seems to not support materials -> the scanner needs some material to perform calculations,
                 # so we don't use this format for now :(
-                #if fileName.endswith(".x3d") or fileName.endswith(".wrl"):
+                # if fileName.endswith(".x3d") or fileName.endswith(".wrl"):
                 #    bpy.ops.import_scene.x3d(filepath=currentFile)
-                
+
                 # set the selected objects active
                 # we don't need this step fpr gltf files as the importer already sets the object as active
                 context.view_layer.objects.active = bpy.context.selected_objects[0]
-            
+
             # join objects in case the model consists of multiple parts
             # otherwise we can't simply transfer all properties of the original object
             bpy.ops.object.join()
@@ -1374,9 +1341,9 @@ def performScan(context, properties):
             properties.swapObject.data = importedObject.data
 
             # if you want to keep the translation (or any other property) of the original object, you can use following code
-            #originalTranslation = properties.swapObject.matrix_world.translation.copy()
-            #properties.swapObject.matrix_world = importedObject.matrix_world
-            #properties.swapObject.matrix_world.translation = originalTranslation
+            # originalTranslation = properties.swapObject.matrix_world.translation.copy()
+            # properties.swapObject.matrix_world = importedObject.matrix_world
+            # properties.swapObject.matrix_world.translation = originalTranslation
 
             # delete the imported object as we copied it and don't need it anymore
             bpy.ops.object.delete({"selected_objects": [importedObject]})
@@ -1385,31 +1352,54 @@ def performScan(context, properties):
     else:
         modifyAndScan(context, properties, None)
 
-def scan_rotating(context, 
-        scannerObject,
 
-        xStepDegree, fovX, yStepDegree, fovY, rotationsPerSecond,
-
-        reflectivityLower, distanceLower, reflectivityUpper, distanceUpper, maxReflectionDepth,
-        
-        enableAnimation, frameStart, frameEnd, frameStep, frameRate,
-
-        addNoise, noiseType, mu, sigma, noiseAbsoluteOffset, noiseRelativeOffset,
-
-        simulateRain, rainfallRate, 
-
-        addMesh,
-
-        exportLAS, exportHDF, exportCSV, exportPLY, exportSingleFrames,
-        dataFilePath, dataFileName,
-        
-        debugLines, debugOutput, outputProgress, measureTime, singleRay, destinationObject, targetObject,
+def scan_rotating(
+    context,
+    scannerObject,
+    xStepDegree,
+    fovX,
+    yStepDegree,
+    fovY,
+    rotationsPerSecond,
+    reflectivityLower,
+    distanceLower,
+    reflectivityUpper,
+    distanceUpper,
+    maxReflectionDepth,
+    enableAnimation,
+    frameStart,
+    frameEnd,
+    frameStep,
+    frameRate,
+    addNoise,
+    noiseType,
+    mu,
+    sigma,
+    noiseAbsoluteOffset,
+    noiseRelativeOffset,
+    simulateRain,
+    rainfallRate,
+    addMesh,
+    exportLAS,
+    exportHDF,
+    exportCSV,
+    exportPLY,
+    exportSingleFrames,
+    dataFilePath,
+    dataFileName,
+    debugLines,
+    debugOutput,
+    outputProgress,
+    measureTime,
+    singleRay,
+    destinationObject,
+    targetObject,
 ):
 
     scene = context.scene
     properties = scene.scannerProperties
 
-    properties.scannerType = 'rotating'
+    properties.scannerType = "rotating"
     properties.scannerObject = scannerObject
 
     properties.fovX = fovX
@@ -1423,7 +1413,7 @@ def scan_rotating(context,
     properties.reflectivityUpper = reflectivityUpper
     properties.distanceUpper = distanceUpper
     properties.maxReflectionDepth = maxReflectionDepth
-    
+
     properties.enableAnimation = enableAnimation
     properties.frameStart = frameStart
     properties.frameEnd = frameEnd
@@ -1449,7 +1439,7 @@ def scan_rotating(context,
     properties.exportSingleFrames = exportSingleFrames
     properties.dataFilePath = dataFilePath
     properties.dataFileName = dataFileName
-    
+
     properties.debugLines = debugLines
     properties.debugOutput = debugOutput
     properties.outputProgress = outputProgress
@@ -1460,33 +1450,55 @@ def scan_rotating(context,
 
     performScan(context, properties)
 
-def scan_sonar(context, 
-        scannerObject,
 
-        maxDistance, fovSonar, sonarStepDegree, sonarMode3D, sonarKeepRotation,
-
-        sourceLevel, noiseLevel, directivityIndex, processingGain, receptionThreshold,   
-
-        simulateWaterProfile, depthList,  
-
-        enableAnimation, frameStart, frameEnd, frameStep,
-
-        addNoise, noiseType, mu, sigma, noiseAbsoluteOffset, noiseRelativeOffset,
-
-        simulateRain, rainfallRate, 
-
-        addMesh,
-
-        exportLAS, exportHDF, exportCSV, exportPLY, exportSingleFrames,
-        dataFilePath, dataFileName,
-        
-        debugLines, debugOutput, outputProgress, measureTime, singleRay, destinationObject, targetObject,
+def scan_sonar(
+    context,
+    scannerObject,
+    maxDistance,
+    fovSonar,
+    sonarStepDegree,
+    sonarMode3D,
+    sonarKeepRotation,
+    sourceLevel,
+    noiseLevel,
+    directivityIndex,
+    processingGain,
+    receptionThreshold,
+    simulateWaterProfile,
+    depthList,
+    enableAnimation,
+    frameStart,
+    frameEnd,
+    frameStep,
+    addNoise,
+    noiseType,
+    mu,
+    sigma,
+    noiseAbsoluteOffset,
+    noiseRelativeOffset,
+    simulateRain,
+    rainfallRate,
+    addMesh,
+    exportLAS,
+    exportHDF,
+    exportCSV,
+    exportPLY,
+    exportSingleFrames,
+    dataFilePath,
+    dataFileName,
+    debugLines,
+    debugOutput,
+    outputProgress,
+    measureTime,
+    singleRay,
+    destinationObject,
+    targetObject,
 ):
 
     scene = context.scene
     properties = scene.scannerProperties
 
-    properties.scannerType = 'sideScan'
+    properties.scannerType = "sideScan"
     properties.scannerObject = scannerObject
 
     properties.maxDistance = maxDistance
@@ -1528,7 +1540,7 @@ def scan_sonar(context,
     properties.exportSingleFrames = exportSingleFrames
     properties.dataFilePath = dataFilePath
     properties.dataFileName = dataFileName
-    
+
     properties.debugLines = debugLines
     properties.debugOutput = debugOutput
     properties.outputProgress = outputProgress
@@ -1540,35 +1552,62 @@ def scan_sonar(context,
     performScan(context, properties)
 
 
-def scan_static(context, 
-        scannerObject,
-
-        resolutionX, fovX, resolutionY, fovY, resolutionPercentage,
-
-        reflectivityLower, distanceLower, reflectivityUpper, distanceUpper, maxReflectionDepth,
-        
-        enableAnimation, frameStart, frameEnd, frameStep, frameRate,
-
-        addNoise, noiseType, mu, sigma, noiseAbsoluteOffset, noiseRelativeOffset,
-
-        simulateRain, rainfallRate, 
-
-        addMesh,
-
-        exportLAS, exportHDF, exportCSV, exportPLY, exportSingleFrames,
-        exportRenderedImage, exportSegmentedImage, exportPascalVoc, exportDepthmap, depthMinDistance, depthMaxDistance, 
-        dataFilePath, dataFileName,
-        
-        debugLines, debugOutput, outputProgress, measureTime, singleRay, destinationObject, targetObject,
+def scan_static(
+    context,
+    scannerObject,
+    resolutionX,
+    fovX,
+    resolutionY,
+    fovY,
+    resolutionPercentage,
+    reflectivityLower,
+    distanceLower,
+    reflectivityUpper,
+    distanceUpper,
+    maxReflectionDepth,
+    enableAnimation,
+    frameStart,
+    frameEnd,
+    frameStep,
+    frameRate,
+    addNoise,
+    noiseType,
+    mu,
+    sigma,
+    noiseAbsoluteOffset,
+    noiseRelativeOffset,
+    simulateRain,
+    rainfallRate,
+    addMesh,
+    exportLAS,
+    exportHDF,
+    exportCSV,
+    exportPLY,
+    exportSingleFrames,
+    exportRenderedImage,
+    exportSegmentedImage,
+    exportPascalVoc,
+    exportDepthmap,
+    depthMinDistance,
+    depthMaxDistance,
+    dataFilePath,
+    dataFileName,
+    debugLines,
+    debugOutput,
+    outputProgress,
+    measureTime,
+    singleRay,
+    destinationObject,
+    targetObject,
 ):
 
     scene = context.scene
     properties = scene.scannerProperties
 
-    properties.scannerType = 'static'
+    properties.scannerType = "static"
     properties.scannerObject = scannerObject
 
-    properties.resolutionX =  resolutionX
+    properties.resolutionX = resolutionX
     properties.fovX = fovX
     properties.resolutionY = resolutionY
     properties.fovY = fovY
@@ -1579,7 +1618,7 @@ def scan_static(context,
     properties.reflectivityUpper = reflectivityUpper
     properties.distanceUpper = distanceUpper
     properties.maxReflectionDepth = maxReflectionDepth
-    
+
     properties.enableAnimation = enableAnimation
     properties.frameStart = frameStart
     properties.frameEnd = frameEnd
@@ -1611,7 +1650,7 @@ def scan_static(context,
     properties.depthMaxDistance = depthMaxDistance
     properties.dataFilePath = dataFilePath
     properties.dataFileName = dataFileName
-    
+
     properties.debugLines = debugLines
     properties.debugOutput = debugOutput
     properties.outputProgress = outputProgress
@@ -1622,6 +1661,215 @@ def scan_static(context,
 
     performScan(context, properties)
 
+
+def _resolve_scene_object(context, object_or_name, field_name):
+    if object_or_name is None:
+        return None
+
+    if isinstance(object_or_name, str):
+        obj = context.scene.objects.get(object_or_name)
+        if obj is None:
+            raise ValueError(
+                "Object '%s' for %s was not found in the scene."
+                % (object_or_name, field_name)
+            )
+        return obj
+
+    return object_or_name
+
+
+def _replace_water_profile(scene, depth_list):
+    scene.custom.clear()
+
+    if depth_list is None:
+        return
+
+    for entry in depth_list:
+        if isinstance(entry, dict):
+            depth = entry["depth"]
+            speed = entry["speed"]
+            density = entry["density"]
+        else:
+            (depth, speed, density) = entry
+
+        item = scene.custom.add()
+        item.depth = depth
+        item.speed = speed
+        item.density = density
+
+
+def _apply_property_values(properties, values, suffix=""):
+    for key, value in values.items():
+        property_name = key + suffix
+
+        if property_name in ("scannerObject", "scannerObject2"):
+            continue
+
+        if not hasattr(properties, property_name):
+            raise ValueError("Unknown scanner property '%s'." % property_name)
+
+        setattr(properties, property_name, value)
+
+
+def _apply_pose_override(scanner_object, pose):
+    if scanner_object is None or pose is None:
+        return None
+
+    original_state = {
+        "location": scanner_object.location.copy(),
+        "rotation_mode": scanner_object.rotation_mode,
+        "rotation_euler": scanner_object.rotation_euler.copy(),
+    }
+
+    if "location" in pose and pose["location"] is not None:
+        scanner_object.location = Vector(pose["location"])
+
+    if "rotation_euler_rad" in pose and pose["rotation_euler_rad"] is not None:
+        scanner_object.rotation_mode = "XYZ"
+        scanner_object.rotation_euler = Euler(pose["rotation_euler_rad"], "XYZ")
+
+    if "rotation_euler_deg" in pose and pose["rotation_euler_deg"] is not None:
+        scanner_object.rotation_mode = "XYZ"
+        scanner_object.rotation_euler = Euler(
+            tuple(radians(value) for value in pose["rotation_euler_deg"]),
+            "XYZ",
+        )
+
+    if "look_at" in pose and pose["look_at"] is not None:
+        direction = Vector(pose["look_at"]) - scanner_object.location
+        scanner_object.rotation_mode = "XYZ"
+        scanner_object.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+
+    return original_state
+
+
+def _restore_pose(scanner_object, original_state):
+    if scanner_object is None or original_state is None:
+        return
+
+    scanner_object.location = original_state["location"]
+    scanner_object.rotation_mode = original_state["rotation_mode"]
+    scanner_object.rotation_euler = original_state["rotation_euler"]
+
+
+def _build_multi_sensor_report_path(properties):
+    cleaned_file_name = generic.removeInvalidCharatersFromFileName(
+        properties.dataFileName + "_multi_sensor"
+    )
+    return os.path.join(
+        bpy.path.abspath(properties.dataFilePath),
+        "%s_report.json" % cleaned_file_name,
+    )
+
+
+def scan_multi_sensor(
+    context,
+    primary_config,
+    secondary_config,
+    common_config=None,
+    water_profile=None,
+    primary_pose=None,
+    secondary_pose=None,
+):
+    scene = context.scene
+    properties = scene.scannerProperties
+
+    primary_values = copy.deepcopy(primary_config)
+    secondary_values = copy.deepcopy(secondary_config or {})
+    common_values = copy.deepcopy(common_config or {})
+
+    blend_path = bpy.data.filepath
+    base_path = os.path.dirname(blend_path) if blend_path else os.getcwd()
+
+    properties.scannerObject = _resolve_scene_object(
+        context,
+        primary_values.pop("scannerObject", None),
+        "primary scannerObject",
+    )
+    secondary_object_name = secondary_values.pop("scannerObject", None)
+    if secondary_object_name is not None:
+        properties.scannerObject2 = _resolve_scene_object(
+            context,
+            secondary_object_name,
+            "secondary scannerObject",
+        )
+    else:
+        properties.scannerObject2 = None
+
+    if "scannerType" not in primary_values:
+        raise ValueError("primary_config must include 'scannerType'.")
+    if properties.scannerObject2 is not None and "scannerType" not in secondary_values:
+        raise ValueError(
+            "secondary_config must include 'scannerType' when a secondary scanner is configured."
+        )
+
+    properties.scannerType = primary_values.pop("scannerType")
+    if properties.scannerObject2 is not None:
+        properties.scannerType2 = secondary_values.pop("scannerType")
+    else:
+        properties.scannerType2 = "static"
+
+    if "destinationObject" in common_values:
+        common_values["destinationObject"] = _resolve_scene_object(
+            context,
+            common_values["destinationObject"],
+            "destinationObject",
+        )
+
+    if "targetObject" in common_values:
+        common_values["targetObject"] = _resolve_scene_object(
+            context,
+            common_values["targetObject"],
+            "targetObject",
+        )
+
+    if "dataFilePath" in common_values and isinstance(
+        common_values["dataFilePath"], str
+    ):
+        common_values["dataFilePath"] = generic.normalizeOutputPath(
+            base_path,
+            common_values["dataFilePath"],
+        )
+
+    noise_seed = common_values.pop("noiseSeed", None)
+    setattr(properties, "noiseSeed", noise_seed)
+    if noise_seed is not None:
+        error_distribution.setSeed(noise_seed)
+
+    for property_name, default_value in [
+        ("gnssDriftMeters", 0.0),
+        ("gnssDriftHeadingDegrees", 0.0),
+        ("seaStateAmplitudeMeters", 0.0),
+        ("seaStatePeriodFrames", 20),
+        ("seaStatePhaseDegrees", 0.0),
+        ("referenceDepthFile", None),
+    ]:
+        setattr(
+            properties, property_name, common_values.pop(property_name, default_value)
+        )
+
+    _apply_property_values(properties, common_values)
+    _apply_property_values(properties, primary_values)
+    _apply_property_values(properties, secondary_values, "2")
+    _replace_water_profile(scene, water_profile)
+
+    primary_pose_state = _apply_pose_override(properties.scannerObject, primary_pose)
+    secondary_pose_state = _apply_pose_override(
+        properties.scannerObject2, secondary_pose
+    )
+
+    try:
+        result = generic.performMultiSensorScan(context, properties)
+    finally:
+        _restore_pose(properties.scannerObject, primary_pose_state)
+        _restore_pose(properties.scannerObject2, secondary_pose_state)
+
+    return {
+        "result": result,
+        "report_path": _build_multi_sensor_report_path(properties),
+    }
+
+
 class WM_OT_GENERATE_POINT_CLOUDS(Operator):
     bl_label = "Generate point clouds"
     bl_idname = "wm.execute_scan"
@@ -1631,13 +1879,11 @@ class WM_OT_GENERATE_POINT_CLOUDS(Operator):
         scene = context.scene
         properties = scene.scannerProperties
 
-
         if properties.measureTime:
             startTime = time.time()
 
-
         performScan(context, properties)
-        
+
         """
         scan_static(
             context, 
@@ -1722,11 +1968,12 @@ class WM_OT_GENERATE_POINT_CLOUDS(Operator):
             debugLines=False, debugOutput=False, outputProgress=True, measureTime=False, singleRay=False, destinationObject=None, targetObject=None
         )  
         """
-        
+
         if properties.measureTime:
             print("Total execution time: %s s" % (time.time() - startTime))
 
-        return {'FINISHED'}
+        return {"FINISHED"}
+
 
 class WM_OT_SCAN_BOTH(Operator):
     bl_label = "Scan Both Sensors"
@@ -1737,13 +1984,15 @@ class WM_OT_SCAN_BOTH(Operator):
         scene = context.scene
         properties = scene.scannerProperties
 
-        if properties.scannerObject is None:
-            self.report({'ERROR'}, "First scanner object not selected!")
-            return {'CANCELLED'}
+        validation_result = generic.validateMultiSensorScan(context, properties)
+        if validation_result["errors"]:
+            for warning in validation_result["warnings"]:
+                self.report({"WARNING"}, warning)
+            self.report({"ERROR"}, validation_result["errors"][0])
+            return {"CANCELLED"}
 
-        if properties.scannerObject2 is None:
-            self.report({'ERROR'}, "Second scanner object not selected!")
-            return {'CANCELLED'}
+        for warning in validation_result["warnings"]:
+            self.report({"WARNING"}, warning)
 
         if properties.measureTime:
             startTime = time.time()
@@ -1754,15 +2003,16 @@ class WM_OT_SCAN_BOTH(Operator):
         if properties.measureTime:
             print("Total multi-sensor execution time: %s s" % (time.time() - startTime))
 
-        return {'FINISHED'}
+        return {"FINISHED"}
+
 
 # define UI panels
 class OBJECT_PT_MAIN_PANEL(MAIN_PANEL, Panel):
     bl_label = "Point clouds"
     bl_idname = "OBJECT_PT_MAIN_PANEL"
- 
+
     @classmethod
-    def poll(self,context):
+    def poll(self, context):
         return context.object is not None
 
     def draw(self, context):
@@ -1772,7 +2022,7 @@ class OBJECT_PT_MAIN_PANEL(MAIN_PANEL, Panel):
 
         # Scanner Objects Section
         box = layout.box()
-        box.label(text="Scanner Objects", icon='OUTLINER_OB_CAMERA')
+        box.label(text="Scanner Objects", icon="OUTLINER_OB_CAMERA")
 
         row = box.row()
         col = row.column()
@@ -1814,29 +2064,36 @@ class OBJECT_PT_MULTI_SENSOR_PANEL(MAIN_PANEL, Panel):
         box = layout.box()
 
         row = box.row()
-        row.label(text="Primary:", icon='OUTLINER_OB_CAMERA')
+        row.label(text="Primary:", icon="OUTLINER_OB_CAMERA")
         if properties.scannerObject:
-            row.label(text=f"{properties.scannerObject.name} ({properties.scannerType})")
+            row.label(
+                text=f"{properties.scannerObject.name} ({properties.scannerType})"
+            )
         else:
-            row.label(text="Not set", icon='ERROR')
+            row.label(text="Not set", icon="ERROR")
 
         row = box.row()
-        row.label(text="Secondary:", icon='OUTLINER_OB_CAMERA')
+        row.label(text="Secondary:", icon="OUTLINER_OB_CAMERA")
         if properties.scannerObject2:
-            row.label(text=f"{properties.scannerObject2.name} ({properties.scannerType2})")
+            row.label(
+                text=f"{properties.scannerObject2.name} ({properties.scannerType2})"
+            )
         else:
-            row.label(text="Not set", icon='REMOVE')
+            row.label(text="Not set", icon="REMOVE")
 
         layout.separator()
 
         # Scan Both button
         col = layout.column()
         col.scale_y = 1.5
-        col.enabled = properties.scannerObject is not None and properties.scannerObject2 is not None
-        col.operator("wm.scan_both", text="Scan Both Sensors", icon='PLAY')
+        col.enabled = (
+            properties.scannerObject is not None
+            and properties.scannerObject2 is not None
+        )
+        col.operator("wm.scan_both", text="Scan Both Sensors", icon="PLAY")
 
         if properties.scannerObject is None or properties.scannerObject2 is None:
-            layout.label(text="Select both scanners to enable", icon='INFO')
+            layout.label(text="Select both scanners to enable", icon="INFO")
 
 
 class OBJECT_PT_PRESET_PANEL(MAIN_PANEL, Panel):
@@ -1844,7 +2101,7 @@ class OBJECT_PT_PRESET_PANEL(MAIN_PANEL, Panel):
     bl_label = "Presets"
 
     @classmethod
-    def poll(self,context):
+    def poll(self, context):
         return context.object is not None
 
     def draw(self, context):
@@ -1853,10 +2110,10 @@ class OBJECT_PT_PRESET_PANEL(MAIN_PANEL, Panel):
         properties = scene.scannerProperties
 
         layout.label(text="Scanner category")
-        layout.prop(properties, "scannerCategory", text="") 
+        layout.prop(properties, "scannerCategory", text="")
 
         layout.label(text="Scanner name")
-        layout.prop(properties, "scannerName", text="") 
+        layout.prop(properties, "scannerName", text="")
         layout.operator("wm.load_preset")
 
 
@@ -1865,8 +2122,12 @@ class OBJECT_PT_REFLECTIVITY_PANEL(MAIN_PANEL, Panel):
     bl_label = "Reflectivity"
 
     @classmethod
-    def poll(self,context):
-        return context.object is not None and context.scene.scannerProperties.scannerType != generic.ScannerType.sideScan.name
+    def poll(self, context):
+        return (
+            context.object is not None
+            and context.scene.scannerProperties.scannerType
+            != generic.ScannerType.sideScan.name
+        )
 
     def draw(self, context):
         layout = self.layout
@@ -1901,7 +2162,7 @@ class OBJECT_PT_SCANNER_PANEL(MAIN_PANEL, Panel):
         properties = scene.scannerProperties
 
         # Determine which scanner we're configuring
-        is_primary = properties.activeScanner == 'primary'
+        is_primary = properties.activeScanner == "primary"
         suffix = "" if is_primary else "2"
 
         # Show which scanner is being configured
@@ -1914,11 +2175,11 @@ class OBJECT_PT_SCANNER_PANEL(MAIN_PANEL, Panel):
 
         box = layout.box()
         row = box.row()
-        row.label(text=f"Configuring: {scanner_label}", icon='RADIOBUT_ON')
+        row.label(text=f"Configuring: {scanner_label}", icon="RADIOBUT_ON")
         if scanner_obj:
             row.label(text=f"({scanner_obj.name})")
         else:
-            row.label(text="(Not set)", icon='ERROR')
+            row.label(text="(Not set)", icon="ERROR")
 
         layout.separator()
 
@@ -1971,7 +2232,16 @@ class OBJECT_PT_SCANNER_PANEL(MAIN_PANEL, Panel):
 
         rows = 3
         row = profileColumn.row()
-        row.template_list("CUSTOM_UL_items", "", scene, "custom", scene, "custom_index", rows=rows, sort_lock=True)
+        row.template_list(
+            "CUSTOM_UL_items",
+            "",
+            scene,
+            "custom",
+            scene,
+            "custom_index",
+            rows=rows,
+            sort_lock=True,
+        )
 
         profileColumn.label(text="New item")
         row = profileColumn.row()
@@ -1982,8 +2252,8 @@ class OBJECT_PT_SCANNER_PANEL(MAIN_PANEL, Panel):
         row.prop(properties, "refractionSpeed")
         row.prop(properties, "refractionDensity")
         col.separator()
-        col.operator("custom.add_items", icon='ADD')
-        col.operator("custom.remove_item", icon='REMOVE')
+        col.operator("custom.add_items", icon="ADD")
+        col.operator("custom.remove_item", icon="REMOVE")
 
         col.separator()
 
@@ -2027,7 +2297,7 @@ class OBJECT_PT_ANIMATION_PANEL(MAIN_PANEL, Panel):
     bl_label = "Animation"
 
     @classmethod
-    def poll(self,context):
+    def poll(self, context):
         return context.object is not None
 
     def draw(self, context):
@@ -2043,21 +2313,22 @@ class OBJECT_PT_ANIMATION_PANEL(MAIN_PANEL, Panel):
         verticalLayout.prop(properties, "frameEnd")
         subLayout.prop(properties, "frameStep")
         subLayout.prop(properties, "frameRate")
-        subLayout.enabled = properties.enableAnimation       
+        subLayout.enabled = properties.enableAnimation
+
 
 class OBJECT_PT_OBJECT_MODIFICATION_PANEL(MAIN_PANEL, Panel):
     bl_parent_id = "OBJECT_PT_MAIN_PANEL"
     bl_label = "Object Modification"
 
     @classmethod
-    def poll(self,context):
+    def poll(self, context):
         return context.object is not None
 
     def draw(self, context):
         layout = self.layout
         scene = context.scene
         properties = scene.scannerProperties
-        
+
         layout.label(text="Object to be modified")
         layout.prop(properties, "swapObject")
 
@@ -2136,7 +2407,7 @@ class OBJECT_PT_NOISE_PANEL(MAIN_PANEL, Panel):
     bl_label = "Noise"
 
     @classmethod
-    def poll(self,context):
+    def poll(self, context):
         return context.object is not None
 
     def draw(self, context):
@@ -2149,7 +2420,7 @@ class OBJECT_PT_NOISE_PANEL(MAIN_PANEL, Panel):
         column.prop(properties, "noiseAbsoluteOffset")
         column.prop(properties, "noiseRelativeOffset")
         column.enabled = properties.addConstantNoise
-        
+
         layout.separator()
 
         layout.prop(properties, "addNoise")
@@ -2166,8 +2437,12 @@ class OBJECT_PT_WEATHER_PANEL(MAIN_PANEL, Panel):
     bl_label = "Weather simulation"
 
     @classmethod
-    def poll(self,context):
-        return context.object is not None and context.scene.scannerProperties.scannerType != generic.ScannerType.sideScan.name
+    def poll(self, context):
+        return (
+            context.object is not None
+            and context.scene.scannerProperties.scannerType
+            != generic.ScannerType.sideScan.name
+        )
 
     def draw(self, context):
         layout = self.layout
@@ -2175,7 +2450,7 @@ class OBJECT_PT_WEATHER_PANEL(MAIN_PANEL, Panel):
         properties = scene.scannerProperties
 
         layout.prop(properties, "weatherType")
-       
+
         if properties.weatherType == "rain":
             layout.prop(properties, "simulateRain")
             layout.prop(properties, "rainfallRate")
@@ -2185,29 +2460,31 @@ class OBJECT_PT_WEATHER_PANEL(MAIN_PANEL, Panel):
             layout.prop(properties, "particleRadius")
             layout.prop(properties, "particlesPcm")
             layout.prop(properties, "dustCloudStart")
-            layout.prop(properties, "dustCloudLength") 
+            layout.prop(properties, "dustCloudLength")
+
 
 class OBJECT_PT_VISUALIZATION_PANEL(MAIN_PANEL, Panel):
     bl_parent_id = "OBJECT_PT_MAIN_PANEL"
     bl_label = "Visualization"
 
     @classmethod
-    def poll(self,context):
+    def poll(self, context):
         return context.object is not None
 
     def draw(self, context):
         layout = self.layout
         scene = context.scene
         properties = scene.scannerProperties
-        
+
         layout.prop(properties, "addMesh")
+
 
 class OBJECT_PT_EXPORT_PANEL(MAIN_PANEL, Panel):
     bl_parent_id = "OBJECT_PT_MAIN_PANEL"
     bl_label = "Export"
 
     @classmethod
-    def poll(self,context):
+    def poll(self, context):
         return context.object is not None
 
     def draw(self, context):
@@ -2229,9 +2506,8 @@ class OBJECT_PT_EXPORT_PANEL(MAIN_PANEL, Panel):
 
             layout.prop(properties, "exportRenderedImage")
 
-
             verticalLayout = layout.row()
-            verticalLayout.prop(properties, "exportSegmentedImage") 
+            verticalLayout.prop(properties, "exportSegmentedImage")
             xmlLayout = verticalLayout.column()
             xmlLayout.prop(properties, "exportPascalVoc")
             xmlLayout.enabled = properties.exportSegmentedImage
@@ -2247,22 +2523,20 @@ class OBJECT_PT_EXPORT_PANEL(MAIN_PANEL, Panel):
         layout.prop(properties, "dataFilePath")
         layout.prop(properties, "dataFileName")
 
-        
-
 
 class OBJECT_PT_DEBUG_PANEL(MAIN_PANEL, Panel):
     bl_parent_id = "OBJECT_PT_MAIN_PANEL"
     bl_label = "DEBUG"
 
     @classmethod
-    def poll(self,context):
+    def poll(self, context):
         return context.object is not None
 
     def draw(self, context):
         layout = self.layout
         scene = context.scene
         properties = scene.scannerProperties
-        
+
         layout.prop(properties, "debugLines")
         layout.prop(properties, "debugOutput")
         layout.prop(properties, "outputProgress")
@@ -2279,32 +2553,31 @@ class OBJECT_PT_DEBUG_PANEL(MAIN_PANEL, Panel):
         column2 = verticalLayout.column()
         column2.label(text="Target")
         column2.prop(properties, "targetObject")
-            
 
 
-
-
-
-
-
-############################################################# 
+#############################################################
 #                                                           #
 #                   WATER PROFILE LIST                      #
 #                                                           #
 #############################################################
 
+
 def sortList(customList):
     # sort list items
     # selection sort is just fine as it is simple and we don't have that many items
     # see: https://en.wikipedia.org/wiki/Selection_sort#Implementations
-    for index in range(len(customList.items()) - 1):          
+    for index in range(len(customList.items()) - 1):
         minimumIndex = index
 
         for innerIndex in range(index, len(customList.items())):
-            if customList.items()[innerIndex][1].depth < customList.items()[minimumIndex][1].depth:
+            if (
+                customList.items()[innerIndex][1].depth
+                < customList.items()[minimumIndex][1].depth
+            ):
                 minimumIndex = innerIndex
-        
+
         customList.move(minimumIndex, index)
+
 
 # adapted from https://blender.stackexchange.com/a/30446/95167
 def addItemToList(scene, depth, speed, density, customList):
@@ -2314,7 +2587,8 @@ def addItemToList(scene, depth, speed, density, customList):
     item.depth = depth
     item.speed = speed
     item.density = density
-    scene.custom_index = len(customList)-1
+    scene.custom_index = len(customList) - 1
+
 
 def removeDuplicatesFromList(scene, customList):
     # remove potential duplicates
@@ -2324,7 +2598,8 @@ def removeDuplicatesFromList(scene, customList):
         removed_items.append(i)
 
     if removed_items:
-        scene.custom_index = len(customList)-1
+        scene.custom_index = len(customList) - 1
+
 
 def find_duplicates(customList):
     """find all duplicates by name"""
@@ -2337,12 +2612,15 @@ def find_duplicates(customList):
             duplicates.add(i)
     return sorted(list(duplicates))
 
+
 class CUSTOM_OT_addItem(Operator):
     """Add item"""
+
     bl_idname = "custom.add_items"
     bl_label = "Add /Edit item"
     bl_description = ""
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
+
     @classmethod
     def poll(cls, context):
         return context.object is not None
@@ -2350,20 +2628,28 @@ class CUSTOM_OT_addItem(Operator):
     def execute(self, context):
         scene = context.scene
 
-        addItemToList(scene, scene.scannerProperties.refractionDepth, scene.scannerProperties.refractionSpeed, scene.scannerProperties.refractionDensity, scene.custom)
+        addItemToList(
+            scene,
+            scene.scannerProperties.refractionDepth,
+            scene.scannerProperties.refractionSpeed,
+            scene.scannerProperties.refractionDensity,
+            scene.custom,
+        )
 
         removeDuplicatesFromList(scene, scene.custom)
 
         sortList(scene.custom)
 
-        return{'FINISHED'}
+        return {"FINISHED"}
+
 
 class CUSTOM_OT_removeItem(Operator):
     """Remove item"""
+
     bl_idname = "custom.remove_item"
     bl_label = "Remove item"
     bl_description = ""
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_options = {"REGISTER", "UNDO"}
 
     @classmethod
     def poll(cls, context):
@@ -2379,14 +2665,16 @@ class CUSTOM_OT_removeItem(Operator):
         my_list.remove(index)
         scn.custom_index = min(max(0, index - 1), len(my_list) - 1)
 
-        return{'FINISHED'}
+        return {"FINISHED"}
+
 
 class CUSTOM_OT_clearList(Operator):
     """Clear all items of the list"""
+
     bl_idname = "custom.clear_list"
     bl_label = "Clear List"
     bl_description = "Clear all items of the list"
-    bl_options = {'INTERNAL'}
+    bl_options = {"INTERNAL"}
 
     @classmethod
     def poll(cls, context):
@@ -2398,37 +2686,45 @@ class CUSTOM_OT_clearList(Operator):
     def execute(self, context):
         if bool(context.scene.custom):
             context.scene.custom.clear()
-            self.report({'INFO'}, "All items removed")
+            self.report({"INFO"}, "All items removed")
         else:
-            self.report({'INFO'}, "Nothing to remove")
-        return{'FINISHED'}
-
+            self.report({"INFO"}, "Nothing to remove")
+        return {"FINISHED"}
 
 
 class CUSTOM_UL_items(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+    def draw_item(
+        self, context, layout, data, item, icon, active_data, active_propname, index
+    ):
         if index == len(context.scene.custom) - 1:
-            layout.label(text="Depth: > %.2f m, Speed: %.3f m/s, Density: %.3f kg/m³" % (item.depth, item.speed, item.density))
+            layout.label(
+                text="Depth: > %.2f m, Speed: %.3f m/s, Density: %.3f kg/m³"
+                % (item.depth, item.speed, item.density)
+            )
         else:
-            layout.label(text="Depth: %.2f m - %.2fm, Speed: %.3f m/s, Density: %.3f kg/m³" % (item.depth, context.scene.custom[index + 1].depth, item.speed, item.density))
+            layout.label(
+                text="Depth: %.2f m - %.2fm, Speed: %.3f m/s, Density: %.3f kg/m³"
+                % (
+                    item.depth,
+                    context.scene.custom[index + 1].depth,
+                    item.speed,
+                    item.density,
+                )
+            )
 
     def invoke(self, context, event):
-        pass   
+        pass
+
 
 class CUSTOM_objectCollection(PropertyGroup):
     depth: FloatProperty()
     speed: FloatProperty()
     density: FloatProperty()
-    
-
-
-
 
 
 # merge all classes to be displayed
 classes = (
     WM_OT_LOAD_PRESET,
-
     ScannerProperties,
     WM_OT_GENERATE_POINT_CLOUDS,
     WM_OT_SCAN_BOTH,
@@ -2444,7 +2740,6 @@ classes = (
     OBJECT_PT_VISUALIZATION_PANEL,
     OBJECT_PT_EXPORT_PANEL,
     OBJECT_PT_DEBUG_PANEL,
-
     CUSTOM_OT_addItem,
     CUSTOM_OT_removeItem,
     CUSTOM_OT_clearList,
@@ -2454,9 +2749,10 @@ classes = (
 
 config = []
 
+
 # register all needed classes on startup
 def register():
-    global config 
+    global config
 
     for cls in classes:
         bpy.utils.register_class(cls)
@@ -2470,13 +2766,14 @@ def register():
 
     print("Loading config file from %s ..." % configPath)
 
-    with open(configPath, 'r') as stream:
+    with open(configPath, "r") as stream:
         try:
             config = yaml.safe_load(stream)
         except yaml.YAMLError as exc:
             print(exc)
 
     print("Done.")
+
 
 # delete all classes on shutdown
 def unregister():

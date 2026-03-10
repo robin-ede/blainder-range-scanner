@@ -1,0 +1,191 @@
+{
+  "animated_scene_dir": "generated_scenes/degraded_animated_paths",
+  "aggregate_summary_dir": "generated_scenes/output/degraded_animated_path_validation",
+  "selection": {
+    "preferred_trial_name": "degraded_gnss_full_sea_state",
+    "weights": {
+      "point_count": 1.0,
+      "below_water_point_count": 3.0,
+      "sonar_hit_count": 6.0,
+      "sensor_balance": 15000.0,
+      "rmse": 2000.0,
+      "corrected_rmse": 8000.0,
+      "blind_corrected_rmse": 6000.0,
+      "corrected_grid_rmse": 12000.0,
+      "blind_corrected_grid_rmse": 10000.0,
+      "post_fusion_rmse": 5000.0,
+      "reconstructed_rmse": 7000.0,
+      "grid_reconstructed_rmse": 9000.0,
+      "p95": 1000.0,
+      "max": 50.0
+    }
+  },
+  "acceptance": {
+    "rmse_threshold_m": 0.15,
+    "p95_threshold_m": 0.20,
+    "max_threshold_m": 0.45
+  },
+  "validation_batch": {
+    "common_defaults": {
+      "dataFilePath": "//output/degraded_animated_trials",
+      "addMesh": false,
+      "exportCSV": false,
+      "exportLAS": true,
+      "exportHDF": false,
+      "exportPLY": false,
+      "exportSingleFrames": false,
+      "enableAnimation": true,
+      "frameStart": 1,
+      "frameEnd": 30,
+      "frameStep": 1,
+      "frameRate": 10,
+      "noiseSeed": 42,
+      "addNoise": true,
+      "addConstantNoise": false,
+      "noiseType": "gaussian",
+      "mu": 0.0,
+      "sigma": 0.05,
+      "noiseAbsoluteOffset": 0.0,
+      "noiseRelativeOffset": 0.0,
+      "simulateRain": false,
+      "rainfallRate": 0.0,
+      "debugLines": false,
+      "debugOutput": false,
+      "outputProgress": true,
+      "measureTime": true,
+      "singleRay": false,
+      "joinMeshes": false
+    },
+    "primary_defaults": {
+      "scannerObject": "Camera",
+      "scannerType": "rotating",
+      "fovX": 30.0,
+      "fovY": 40.0,
+      "xStepDegree": 0.2,
+      "yStepDegree": 0.33,
+      "rotationsPerSecond": 20.0,
+      "reflectivityLower": 0.0,
+      "distanceLower": 0.0,
+      "reflectivityUpper": 0.0,
+      "distanceUpper": 99999.9,
+      "maxReflectionDepth": 10
+    },
+    "secondary_defaults": {
+      "scannerObject": "Camera.001",
+      "scannerType": "sideScan",
+      "maxDistance": 100.0,
+      "fovSonar": 135.0,
+      "sonarStepDegree": 0.25,
+      "sonarMode3D": true,
+      "sonarKeepRotation": false,
+      "sourceLevel": 220.0,
+      "noiseLevel": 63.0,
+      "directivityIndex": 20.0,
+      "processingGain": 10.0,
+      "receptionThreshold": 10.0,
+      "simulateWaterProfile": false,
+      "surfaceHeight": 0.0
+    },
+    "water_profile": [],
+    "trials": [
+      {
+        "trial_name": "no_degradation_baseline",
+        "common": {
+          "dataFileName": "no_degradation_baseline",
+          "addNoise": false,
+          "gnssDriftMeters": 0.0,
+          "gnssDriftHeadingDegrees": 0.0,
+          "seaStateAmplitudeMeters": 0.0,
+          "seaStatePeriodFrames": 20,
+          "seaStatePhaseDegrees": 0.0
+        }
+      },
+      {
+        "trial_name": "gaussian_noise_only",
+        "common": {
+          "dataFileName": "gaussian_noise_only",
+          "addNoise": true,
+          "sigma": 0.05,
+          "gnssDriftMeters": 0.0,
+          "seaStateAmplitudeMeters": 0.0
+        }
+      },
+      {
+        "trial_name": "degraded_gnss_2m",
+        "common": {
+          "dataFileName": "degraded_gnss_2m",
+          "addNoise": true,
+          "sigma": 0.05,
+          "gnssDriftMeters": 2.0,
+          "gnssDriftHeadingDegrees": 45.0,
+          "seaStateAmplitudeMeters": 0.0,
+          "seaStatePeriodFrames": 20,
+          "seaStatePhaseDegrees": 0.0
+        }
+      },
+      {
+        "trial_name": "degraded_sea_state_05m",
+        "common": {
+          "dataFileName": "degraded_sea_state_05m",
+          "addNoise": true,
+          "sigma": 0.05,
+          "gnssDriftMeters": 0.0,
+          "seaStateAmplitudeMeters": 0.5,
+          "seaStatePeriodFrames": 15,
+          "seaStatePhaseDegrees": 0.0
+        }
+      },
+      {
+        "trial_name": "degraded_gnss_full_sea_state",
+        "common": {
+          "dataFileName": "degraded_gnss_full_sea_state",
+          "addNoise": true,
+          "sigma": 0.05,
+          "gnssDriftMeters": 2.0,
+          "gnssDriftHeadingDegrees": 45.0,
+          "seaStateAmplitudeMeters": 0.5,
+          "seaStatePeriodFrames": 15,
+          "seaStatePhaseDegrees": 0.0
+        }
+      }
+    ]
+  },
+  "paths": [
+    {
+      "path_name": "straight_push_degraded",
+      "frame_start": 1,
+      "frame_end": 30,
+      "look_at": [3.5, 0.0, -0.8],
+      "primary_start": [-12.0, 0.0, 6.5],
+      "primary_end": [-2.5, 0.0, 7.5],
+      "secondary_start": [-8.0, 0.0, -2.4],
+      "secondary_end": [-1.5, 0.0, -2.0]
+    },
+    {
+      "path_name": "lawnmower_degraded",
+      "frame_start": 1,
+      "frame_end": 30,
+      "look_at": [3.5, 0.0, -0.8],
+      "primary_waypoints": [
+        [-12.0, -5.0, 6.8],
+        [-3.0, -5.0, 6.8],
+        [-3.0, -1.5, 7.0],
+        [-12.0, -1.5, 7.0],
+        [-12.0, 2.0, 7.2],
+        [-3.0, 2.0, 7.2],
+        [-3.0, 5.0, 7.4],
+        [-12.0, 5.0, 7.4]
+      ],
+      "secondary_waypoints": [
+        [-8.0, -4.5, -2.6],
+        [-1.5, -4.5, -2.4],
+        [-1.5, -1.0, -2.2],
+        [-8.0, -1.0, -2.2],
+        [-8.0, 2.0, -2.0],
+        [-1.5, 2.0, -1.9],
+        [-1.5, 4.5, -1.8],
+        [-8.0, 4.5, -1.8]
+      ]
+    }
+  ]
+}

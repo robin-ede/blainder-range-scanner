@@ -1,0 +1,228 @@
+{
+  "generate_scenes": true,
+  "scenes_output_dir": "generated_scenes_multi_seed",
+  "aggregate_summary_dir": "generated_scenes_multi_seed/output/aggregate_validation",
+  "seeds": [42, 43],
+  "combined_validation": {
+    "selection": {
+      "strategy": "composite",
+      "metric": "point_count",
+      "top_k": 1,
+      "descending": true,
+      "weights": {
+        "point_count": 1.0,
+        "sensor_balance": 5000.0,
+        "rmse": 1000.0,
+        "p95": 250.0
+      }
+    },
+    "acceptance": {
+      "rmse_threshold_m": 0.15,
+      "p95_threshold_m": 0.15,
+      "max_threshold_m": 0.45
+    },
+    "combined_summary_dir": "//output/combined_validation",
+    "pose_sweep": {
+      "common_defaults": {
+        "dataFilePath": "//output/fixed_scene_pose_sweep",
+        "addMesh": false,
+        "exportCSV": false,
+        "exportLAS": false,
+        "exportHDF": false,
+        "exportPLY": false,
+        "exportSingleFrames": false,
+        "enableAnimation": false,
+        "frameStart": 1,
+        "frameEnd": 1,
+        "frameStep": 1,
+        "frameRate": 1,
+        "addNoise": false,
+        "addConstantNoise": false,
+        "noiseType": "gaussian",
+        "mu": 0.0,
+        "sigma": 0.01,
+        "noiseAbsoluteOffset": 0.0,
+        "noiseRelativeOffset": 0.0,
+        "simulateRain": false,
+        "rainfallRate": 0.0,
+        "debugLines": false,
+        "debugOutput": false,
+        "outputProgress": true,
+        "measureTime": false,
+        "singleRay": false,
+        "joinMeshes": false
+      },
+      "primary_defaults": {
+        "scannerObject": "Camera",
+        "scannerType": "rotating",
+        "fovX": 30.0,
+        "fovY": 40.0,
+        "xStepDegree": 0.2,
+        "yStepDegree": 0.33,
+        "rotationsPerSecond": 20.0,
+        "reflectivityLower": 0.0,
+        "distanceLower": 0.0,
+        "reflectivityUpper": 0.0,
+        "distanceUpper": 99999.9,
+        "maxReflectionDepth": 10
+      },
+      "secondary_defaults": {
+        "scannerObject": "Camera.001",
+        "scannerType": "sideScan",
+        "maxDistance": 100.0,
+        "fovSonar": 135.0,
+        "sonarStepDegree": 0.25,
+        "sonarMode3D": true,
+        "sonarKeepRotation": false,
+        "sourceLevel": 220.0,
+        "noiseLevel": 63.0,
+        "directivityIndex": 20.0,
+        "processingGain": 10.0,
+        "receptionThreshold": 10.0,
+        "simulateWaterProfile": false,
+        "surfaceHeight": 0.0
+      },
+      "primary_pose_defaults": {
+        "look_at": [3.5, 0.0, -0.8]
+      },
+      "secondary_pose_defaults": {
+        "look_at": [3.5, 0.0, -0.8]
+      },
+      "water_profile": [],
+      "trials": [
+        {
+          "trial_name": "baseline_pose",
+          "primary_pose": {
+            "location": [-12.0, 0.0, 6.5]
+          },
+          "secondary_pose": {
+            "location": [-8.0, 0.0, -2.4]
+          }
+        },
+        {
+          "trial_name": "closer_pair",
+          "primary_pose": {
+            "location": [-8.0, 2.5, 5.0]
+          },
+          "secondary_pose": {
+            "location": [-5.0, 1.5, -2.2]
+          }
+        },
+        {
+          "trial_name": "wide_baseline",
+          "primary_pose": {
+            "location": [-14.0, -5.0, 7.0]
+          },
+          "secondary_pose": {
+            "location": [-6.0, 4.0, -2.8]
+          }
+        },
+        {
+          "trial_name": "top_down_bias",
+          "primary_pose": {
+            "location": [-4.5, 0.0, 9.0]
+          },
+          "secondary_pose": {
+            "location": [-6.5, -2.0, -1.8]
+          }
+        }
+      ]
+    },
+    "noise_sweep": {
+      "common_defaults": {
+        "dataFilePath": "//output/fixed_scene_noise_from_pose",
+        "addMesh": false,
+        "exportCSV": false,
+        "exportLAS": false,
+        "exportHDF": false,
+        "exportPLY": false,
+        "exportSingleFrames": false,
+        "enableAnimation": false,
+        "frameStart": 1,
+        "frameEnd": 1,
+        "frameStep": 1,
+        "frameRate": 1,
+        "addNoise": false,
+        "addConstantNoise": false,
+        "noiseType": "gaussian",
+        "mu": 0.0,
+        "sigma": 0.01,
+        "noiseAbsoluteOffset": 0.0,
+        "noiseRelativeOffset": 0.0,
+        "simulateRain": false,
+        "rainfallRate": 0.0,
+        "debugLines": false,
+        "debugOutput": false,
+        "outputProgress": true,
+        "measureTime": false,
+        "singleRay": false,
+        "joinMeshes": false
+      },
+      "primary_defaults": {
+        "scannerObject": "Camera",
+        "scannerType": "rotating",
+        "fovX": 30.0,
+        "fovY": 40.0,
+        "xStepDegree": 0.2,
+        "yStepDegree": 0.33,
+        "rotationsPerSecond": 20.0,
+        "reflectivityLower": 0.0,
+        "distanceLower": 0.0,
+        "reflectivityUpper": 0.0,
+        "distanceUpper": 99999.9,
+        "maxReflectionDepth": 10
+      },
+      "secondary_defaults": {
+        "scannerObject": "Camera.001",
+        "scannerType": "sideScan",
+        "maxDistance": 100.0,
+        "fovSonar": 135.0,
+        "sonarStepDegree": 0.25,
+        "sonarMode3D": true,
+        "sonarKeepRotation": false,
+        "sourceLevel": 220.0,
+        "noiseLevel": 63.0,
+        "directivityIndex": 20.0,
+        "processingGain": 10.0,
+        "receptionThreshold": 10.0,
+        "simulateWaterProfile": false,
+        "surfaceHeight": 0.0
+      },
+      "water_profile": [],
+      "trials": [
+        {
+          "trial_name": "noise_off",
+          "common": {
+            "dataFileName": "noise_off",
+            "addNoise": false,
+            "addConstantNoise": false
+          }
+        },
+        {
+          "trial_name": "noise_sigma_001",
+          "common": {
+            "dataFileName": "noise_sigma_001",
+            "addNoise": true,
+            "sigma": 0.01
+          }
+        },
+        {
+          "trial_name": "noise_sigma_005",
+          "common": {
+            "dataFileName": "noise_sigma_005",
+            "addNoise": true,
+            "sigma": 0.05
+          }
+        },
+        {
+          "trial_name": "noise_sigma_010",
+          "common": {
+            "dataFileName": "noise_sigma_010",
+            "addNoise": true,
+            "sigma": 0.1
+          }
+        }
+      ]
+    }
+  }
+}
