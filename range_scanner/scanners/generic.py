@@ -1217,6 +1217,7 @@ def performMultiSensorScan(context, properties):
             fused_results["fused_points"],
             targets,
             water_surface_height=water_surface_height,
+            store_spatial_samples=True,
         )
         evaluation_results["post_processing_fusion"] = {
             "fusion_mode": fused_results["fusion_mode"],
@@ -1250,6 +1251,7 @@ def performMultiSensorScan(context, properties):
             "metrics": fused_metrics["metrics"],
             "regional_metrics": fused_metrics["regional_metrics"],
             "acceptance": fused_metrics["acceptance"],
+            "spatial_error_samples": fused_metrics.get("spatial_error_samples"),
         }
 
         reconstructed_results = fusion.reconstruct_medium_separated_map(
