@@ -159,13 +159,21 @@ def evaluate_hits_against_targets(
 
 
 def evaluate_points_against_targets(
-    context, points, targets, rmse_threshold=0.15, water_surface_height=None
+    context,
+    points,
+    targets,
+    rmse_threshold=0.15,
+    water_surface_height=None,
+    store_spatial_samples=False,
+    max_spatial_samples=8000,
 ):
     depsgraph = context.evaluated_depsgraph_get()
     trees = _build_bvh_trees(targets, depsgraph)
 
     distances = []
     regional_distances = {"above_water": [], "below_water": []}
+    spatial_samples = [] if store_spatial_samples else None
+
     for point in points:
         distance = _nearest_distance(point, trees)
         if distance is not None:
@@ -173,6 +181,14 @@ def evaluate_points_against_targets(
             medium = _point_medium(point, water_surface_height)
             if medium in regional_distances:
                 regional_distances[medium].append(distance)
+            if store_spatial_samples:
+                spatial_samples.append(
+                    [float(point[0]), float(point[1]), float(point[2]), float(distance)]
+                )
+
+    if spatial_samples is not None and len(spatial_samples) > max_spatial_samples:
+        step = max(1, math.ceil(len(spatial_samples) / max_spatial_samples))
+        spatial_samples = spatial_samples[::step]
 
     metrics = _metric_summary_from_values(distances)
     regional_metrics = {
@@ -183,7 +199,7 @@ def evaluate_points_against_targets(
         rmse_threshold
     )
 
-    return {
+    result = {
         "metrics": metrics,
         "regional_metrics": regional_metrics,
         "acceptance": {
@@ -191,6 +207,9 @@ def evaluate_points_against_targets(
             "passes_rmse_threshold": threshold_pass,
         },
     }
+    if store_spatial_samples:
+        result["spatial_error_samples"] = spatial_samples
+    return result
 
 
 def compute_depth_histogram(depths, bin_edges):
