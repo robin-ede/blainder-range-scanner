@@ -504,6 +504,7 @@ def build_validation_report(properties, results, warnings=None):
         "medium_filtering": results.get("medium_filtering"),
         "degradation_modeling": results.get("degradation_modeling"),
         "post_processing_fusion": results.get("post_processing_fusion"),
+        "blind_post_processing_fusion": results.get("blind_post_processing_fusion"),
         "medium_separated_reconstruction": results.get(
             "medium_separated_reconstruction"
         ),
@@ -518,6 +519,7 @@ def build_validation_report(properties, results, warnings=None):
         ),
         "depth_distribution_comparison": results.get("depth_distribution_comparison"),
         "performance": results.get("performance"),
+        "technical_objectives": results.get("technical_objectives"),
         "acceptance": results["acceptance"],
         "status": "pass" if results["acceptance"]["passes_rmse_threshold"] else "fail",
         "status_description": (

@@ -63,6 +63,7 @@ _STAGE_KEYS = [
     # is_post_fusion controls bar colour: False→blue, True→green/red vs threshold
     (["pre_fusion_combined_metrics"], "Pre-fusion\n(raw hits)", False),
     (["post_processing_fusion", "metrics"], "Post-fusion\n(voxel)", True),
+    (["blind_post_processing_fusion", "metrics"], "Blind ICP\n+ voxel", True),
     (["medium_separated_reconstruction", "metrics"], "Medium-sep.\nreconstruct", True),
     (["medium_height_grid_reconstruction", "metrics"], "Grid\nreconstruct", True),
     (["alignment_correction", "metrics"], "Ref-corrected\npoints", True),
@@ -192,11 +193,16 @@ def plot_reprojection_heatmap(report, output_path, title=None):
     plt = _get_plt()
     np = _get_np()
 
-    samples = _get_nested(report, ["post_processing_fusion", "spatial_error_samples"])
+    to4_stage = (
+        report.get("technical_objectives", {}).get("TO4", {}).get("official_stage_key")
+    )
+    sample_stage = to4_stage or "post_processing_fusion"
+    samples = _get_nested(report, [sample_stage, "spatial_error_samples"])
     if not samples:
         print(
-            "  [skip] No spatial_error_samples in report.\n"
+            "  [skip] No spatial_error_samples in report for %s.\n"
             "         Re-run the pipeline (the new generic.py now stores them automatically)."
+            % sample_stage
         )
         return None
 
@@ -265,7 +271,8 @@ def plot_reprojection_heatmap(report, output_path, title=None):
     ax.set_ylabel("Y (m)")
     ax.set_title(
         title
-        or "Reprojection Error Heatmap\n(post-fusion · mean surface distance per cell)"
+        or "Reprojection Error Heatmap\n(%s · mean surface distance per cell)"
+        % sample_stage.replace("_", " ")
     )
 
     ax.text(

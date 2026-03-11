@@ -82,22 +82,30 @@ def main(argv):
     blind_corrected_metrics = report.get("blind_alignment_correction", {}).get(
         "metrics", {}
     )
+    blind_fused_metrics = report.get("blind_post_processing_fusion", {}).get(
+        "metrics", {}
+    )
     blind_corrected_grid_metrics = report.get(
         "blind_corrected_grid_reconstruction", {}
     ).get("metrics", {})
     error_reduction = report.get("error_reduction", {})
+    to4 = report.get("technical_objectives", {}).get("TO4", {})
     print(
-        "Pre=%s, corrected=%s, blind=%s, post=%s, stitched=%s, grid=%s, "
-        "corrected_grid=%s, blind_grid=%s, err_reduction=%s%%, pass=%s"
+        "Pre=%s, corrected=%s, blind=%s, blind_fused=%s, post=%s, stitched=%s, "
+        "grid=%s, corrected_grid=%s, blind_grid=%s, TO4_post=%s, TO4_pass=%s, "
+        "err_reduction=%s%%, pass=%s"
         % (
             metrics.get("rmse"),
             corrected_metrics.get("rmse"),
             blind_corrected_metrics.get("rmse"),
+            blind_fused_metrics.get("rmse"),
             fused_metrics.get("rmse"),
             reconstructed_metrics.get("rmse"),
             grid_metrics.get("rmse"),
             corrected_grid_metrics.get("rmse"),
             blind_corrected_grid_metrics.get("rmse"),
+            to4.get("post_fusion_rmse"),
+            to4.get("passes_all"),
             error_reduction.get("error_reduction_pct"),
             report.get("acceptance", {}).get("passes_rmse_threshold"),
         )

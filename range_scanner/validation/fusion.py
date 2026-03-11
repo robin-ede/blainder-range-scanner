@@ -72,19 +72,78 @@ def _robust_weighted_point(bucket):
     return tuple(float(value) for value in representative_point)
 
 
+def _summarize_fused_buckets(voxels, input_count, water_surface_height):
+    fused_points = []
+    per_sensor_contribution = {}
+    multi_sensor_voxels = 0
+    multi_frame_voxels = 0
+    point_counts_by_medium = {"above_water": 0, "below_water": 0}
+    fused_point_counts_by_medium = {"above_water": 0, "below_water": 0}
+
+    for bucket in voxels.values():
+        fused_point = _robust_weighted_point(bucket)
+        fused_points.append(fused_point)
+
+        fused_medium = _point_medium(fused_point, water_surface_height)
+        if fused_medium in fused_point_counts_by_medium:
+            fused_point_counts_by_medium[fused_medium] += 1
+
+        if len(bucket["sensor_counts"]) > 1:
+            multi_sensor_voxels += 1
+        if len(bucket["frames"]) > 1:
+            multi_frame_voxels += 1
+
+        for sensor_id, count in bucket["sensor_counts"].items():
+            per_sensor_contribution[sensor_id] = (
+                per_sensor_contribution.get(sensor_id, 0) + count
+            )
+
+        for point in bucket["points"]:
+            medium = _point_medium(point, water_surface_height)
+            if medium in point_counts_by_medium:
+                point_counts_by_medium[medium] += 1
+
+    return {
+        "input_point_count": input_count,
+        "fused_point_count": len(fused_points),
+        "compression_ratio": (
+            float(len(fused_points)) / float(input_count) if input_count > 0 else None
+        ),
+        "multi_sensor_voxel_count": multi_sensor_voxels,
+        "multi_frame_voxel_count": multi_frame_voxels,
+        "per_sensor_input_counts": per_sensor_contribution,
+        "point_counts_by_medium": point_counts_by_medium,
+        "fused_point_counts_by_medium": fused_point_counts_by_medium,
+        "fused_points": fused_points,
+    }
+
+
 def _fuse_hits_internal(
     hits,
     voxel_size=0.05,
     use_noisy_measurements=False,
     water_surface_height=None,
+    aligned_points=None,
+    fusion_mode="weighted_trimmed_voxel",
 ):
     if voxel_size <= 0.0:
         raise ValueError("voxel_size must be positive")
 
+    if aligned_points is not None and len(aligned_points) != len(hits):
+        raise ValueError("aligned_points must match hits length")
+
     voxels = {}
 
-    for hit in hits:
-        point = _point_tuple(hit, use_noisy_measurements=use_noisy_measurements)
+    for index, hit in enumerate(hits):
+        if aligned_points is None:
+            point = _point_tuple(hit, use_noisy_measurements=use_noisy_measurements)
+        else:
+            aligned_point = aligned_points[index]
+            point = (
+                float(aligned_point[0]),
+                float(aligned_point[1]),
+                float(aligned_point[2]),
+            )
         voxel_key = tuple(int(math.floor(value / voxel_size)) for value in point)
         bucket = voxels.setdefault(
             voxel_key,
@@ -109,51 +168,10 @@ def _fuse_hits_internal(
         if hit.frame is not None:
             bucket["frames"].add(int(hit.frame))
 
-    fused_points = []
-    per_sensor_contribution = {}
-    multi_sensor_voxels = 0
-    multi_frame_voxels = 0
-    point_counts_by_medium = {"above_water": 0, "below_water": 0}
-    fused_point_counts_by_medium = {"above_water": 0, "below_water": 0}
-
-    for hit in hits:
-        point = _point_tuple(hit, use_noisy_measurements=use_noisy_measurements)
-        medium = _point_medium(point, water_surface_height)
-        if medium in point_counts_by_medium:
-            point_counts_by_medium[medium] += 1
-
-    for bucket in voxels.values():
-        fused_point = _robust_weighted_point(bucket)
-        fused_points.append(fused_point)
-
-        fused_medium = _point_medium(fused_point, water_surface_height)
-        if fused_medium in fused_point_counts_by_medium:
-            fused_point_counts_by_medium[fused_medium] += 1
-
-        if len(bucket["sensor_counts"]) > 1:
-            multi_sensor_voxels += 1
-        if len(bucket["frames"]) > 1:
-            multi_frame_voxels += 1
-
-        for sensor_id, count in bucket["sensor_counts"].items():
-            per_sensor_contribution[sensor_id] = (
-                per_sensor_contribution.get(sensor_id, 0) + count
-            )
-
     return {
-        "fusion_mode": "weighted_trimmed_voxel",
+        "fusion_mode": fusion_mode,
         "voxel_size_m": float(voxel_size),
-        "input_point_count": len(hits),
-        "fused_point_count": len(fused_points),
-        "compression_ratio": (
-            float(len(fused_points)) / float(len(hits)) if len(hits) > 0 else None
-        ),
-        "multi_sensor_voxel_count": multi_sensor_voxels,
-        "multi_frame_voxel_count": multi_frame_voxels,
-        "per_sensor_input_counts": per_sensor_contribution,
-        "point_counts_by_medium": point_counts_by_medium,
-        "fused_point_counts_by_medium": fused_point_counts_by_medium,
-        "fused_points": fused_points,
+        **_summarize_fused_buckets(voxels, len(hits), water_surface_height),
     }
 
 
@@ -169,6 +187,56 @@ def voxel_fuse_hits(
         use_noisy_measurements=use_noisy_measurements,
         water_surface_height=water_surface_height,
     )
+
+
+def voxel_fuse_aligned_hits(
+    hits,
+    aligned_points,
+    voxel_size=0.05,
+    water_surface_height=None,
+):
+    return _fuse_hits_internal(
+        hits,
+        voxel_size=voxel_size,
+        water_surface_height=water_surface_height,
+        aligned_points=aligned_points,
+        fusion_mode="aligned_weighted_trimmed_voxel",
+    )
+
+
+def voxel_fuse_points(
+    points,
+    voxel_size=0.05,
+    water_surface_height=None,
+):
+    if voxel_size <= 0.0:
+        raise ValueError("voxel_size must be positive")
+
+    voxels = {}
+
+    for point in points:
+        point_tuple = (float(point[0]), float(point[1]), float(point[2]))
+        voxel_key = tuple(int(math.floor(value / voxel_size)) for value in point_tuple)
+        bucket = voxels.setdefault(
+            voxel_key,
+            {
+                "points": [],
+                "weights": [],
+                "sensor_counts": {},
+                "frames": set(),
+            },
+        )
+        bucket["points"].append(point_tuple)
+        bucket["weights"].append(1.0)
+        bucket["sensor_counts"]["aligned_points"] = (
+            bucket["sensor_counts"].get("aligned_points", 0) + 1
+        )
+
+    return {
+        "fusion_mode": "aligned_trimmed_voxel",
+        "voxel_size_m": float(voxel_size),
+        **_summarize_fused_buckets(voxels, len(points), water_surface_height),
+    }
 
 
 def reconstruct_medium_separated_map(

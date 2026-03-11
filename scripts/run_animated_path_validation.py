@@ -130,10 +130,20 @@ def path_score(summary_item, selection):
             weights.get("blind_corrected_rmse", 0.0)
             * summary_item["blind_corrected_rmse"]
         )
+    if summary_item.get("blind_post_fusion_rmse") is not None:
+        score -= (
+            weights.get("blind_post_fusion_rmse", 0.0)
+            * summary_item["blind_post_fusion_rmse"]
+        )
     if summary_item.get("blind_corrected_grid_rmse") is not None:
         score -= (
             weights.get("blind_corrected_grid_rmse", 0.0)
             * summary_item["blind_corrected_grid_rmse"]
+        )
+    if summary_item.get("to4_post_fusion_rmse") is not None:
+        score -= (
+            weights.get("to4_post_fusion_rmse", 0.0)
+            * summary_item["to4_post_fusion_rmse"]
         )
 
     return score
@@ -302,6 +312,10 @@ def write_aggregate(output_dir, path_summaries, selection):
         "corrected_grid_compression_ratio",
         "blind_corrected_rmse",
         "blind_corrected_p95",
+        "blind_post_fusion_point_count",
+        "blind_post_fusion_rmse",
+        "blind_post_fusion_p95",
+        "blind_post_fusion_compression_ratio",
         "blind_corrected_grid_point_count",
         "blind_corrected_grid_rmse",
         "blind_corrected_grid_p95",
@@ -310,6 +324,13 @@ def write_aggregate(output_dir, path_summaries, selection):
         "error_reduction_pct",
         "meets_80pct_reduction",
         "meets_degraded_baseline_2m",
+        "best_post_fusion_stage",
+        "to4_official_stage",
+        "to4_post_fusion_rmse",
+        "to4_error_reduction_pct",
+        "to4_positional_error_reduction_pct",
+        "to4_passes_post_fusion_rmse_target",
+        "to4_passes_all",
         "ks_statistic",
         "passes_ks_threshold",
         "max_bin_deviation",

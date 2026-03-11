@@ -92,11 +92,14 @@ def summarize_trial(trial, report_path, report):
     alignment_metrics = alignment_correction.get("metrics", {})
     blind_alignment_correction = report.get("blind_alignment_correction", {})
     blind_alignment_metrics = blind_alignment_correction.get("metrics", {})
+    blind_post_fusion = report.get("blind_post_processing_fusion", {})
+    blind_post_fusion_metrics = blind_post_fusion.get("metrics", {})
     corrected_grid = report.get("corrected_grid_reconstruction", {})
     corrected_grid_metrics = corrected_grid.get("metrics", {})
     blind_corrected_grid = report.get("blind_corrected_grid_reconstruction", {})
     blind_corrected_grid_metrics = blind_corrected_grid.get("metrics", {})
     error_reduction = report.get("error_reduction", {})
+    to4 = report.get("technical_objectives", {}).get("TO4", {})
     depth_dist = report.get("depth_distribution_comparison", {})
     performance = report.get("performance", {})
     regional_metrics = report.get("regional_pre_fusion_metrics", {})
@@ -163,6 +166,12 @@ def summarize_trial(trial, report_path, report):
         ),
         "blind_corrected_rmse": blind_alignment_metrics.get("rmse"),
         "blind_corrected_p95": blind_alignment_metrics.get("p95"),
+        "blind_post_fusion_point_count": blind_post_fusion_metrics.get("point_count"),
+        "blind_post_fusion_rmse": blind_post_fusion_metrics.get("rmse"),
+        "blind_post_fusion_p95": blind_post_fusion_metrics.get("p95"),
+        "blind_post_fusion_compression_ratio": blind_post_fusion.get(
+            "point_counts", {}
+        ).get("compression_ratio"),
         "blind_corrected_grid_point_count": blind_corrected_grid_metrics.get(
             "point_count"
         ),
@@ -189,6 +198,13 @@ def summarize_trial(trial, report_path, report):
         "peak_frame_meets_80pct_reduction": error_reduction.get(
             "peak_frame_meets_80pct_reduction"
         ),
+        "best_post_fusion_stage": error_reduction.get("best_post_fusion_stage"),
+        "to4_official_stage": to4.get("official_stage_key"),
+        "to4_post_fusion_rmse": to4.get("post_fusion_rmse"),
+        "to4_error_reduction_pct": to4.get("error_reduction_pct"),
+        "to4_positional_error_reduction_pct": to4.get("positional_error_reduction_pct"),
+        "to4_passes_post_fusion_rmse_target": to4.get("passes_post_fusion_rmse_target"),
+        "to4_passes_all": to4.get("passes_all"),
         "ks_statistic": depth_dist.get("ks_statistic"),
         "ks_p_value": depth_dist.get("ks_p_value"),
         "passes_ks_threshold": depth_dist.get("passes_ks_threshold"),
@@ -270,6 +286,10 @@ def write_summary(summary_dir, scene_path, summaries):
         "corrected_grid_compression_ratio",
         "blind_corrected_rmse",
         "blind_corrected_p95",
+        "blind_post_fusion_point_count",
+        "blind_post_fusion_rmse",
+        "blind_post_fusion_p95",
+        "blind_post_fusion_compression_ratio",
         "blind_corrected_grid_point_count",
         "blind_corrected_grid_rmse",
         "blind_corrected_grid_p95",
@@ -278,6 +298,13 @@ def write_summary(summary_dir, scene_path, summaries):
         "error_reduction_pct",
         "meets_80pct_reduction",
         "degraded_surface_rmse",
+        "best_post_fusion_stage",
+        "to4_official_stage",
+        "to4_post_fusion_rmse",
+        "to4_error_reduction_pct",
+        "to4_positional_error_reduction_pct",
+        "to4_passes_post_fusion_rmse_target",
+        "to4_passes_all",
         "positional_degradation_magnitude_m",
         "meets_positional_baseline_2m",
         "meets_degraded_baseline_2m",
