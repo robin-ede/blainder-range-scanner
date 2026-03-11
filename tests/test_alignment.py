@@ -20,6 +20,7 @@ from range_scanner.validation.alignment import (
 # _sample_points
 # ---------------------------------------------------------------------------
 
+
 class TestSamplePoints:
     def test_below_max_returns_unchanged(self):
         pts = list(range(10))
@@ -47,6 +48,7 @@ class TestSamplePoints:
 # ---------------------------------------------------------------------------
 # _estimate_translation_to_point_cloud
 # ---------------------------------------------------------------------------
+
 
 class TestEstimateTranslation:
     def test_empty_source_returns_zero(self):
@@ -94,13 +96,17 @@ class TestEstimateTranslation:
 # align_hits_to_reference
 # ---------------------------------------------------------------------------
 
+
 class TestAlignHitsToReference:
     def _make_drifted_hits(self, drift_x, frame=1):
         """Hit where clean location != noisy (drifted) location."""
         return make_hit(
-            x=1.0, y=0.0, z=0.0,       # clean reference location
-            noise_x=1.0 - drift_x,      # drifted noisy location
-            noise_y=0.0, noise_z=0.0,
+            x=1.0,
+            y=0.0,
+            z=0.0,  # clean reference location
+            noise_x=1.0 - drift_x,  # drifted noisy location
+            noise_y=0.0,
+            noise_z=0.0,
             frame=frame,
         )
 
@@ -130,9 +136,7 @@ class TestAlignHitsToReference:
         # Frame 1 drifted by 0.5, frame 2 drifted by 1.0
         hit1 = self._make_drifted_hits(drift_x=0.5, frame=1)
         hit2 = self._make_drifted_hits(drift_x=1.0, frame=2)
-        result = align_hits_to_reference(
-            [hit1, hit2], use_noisy_measurements=True
-        )
+        result = align_hits_to_reference([hit1, hit2], use_noisy_measurements=True)
         assert result["translation_summary"]["frame_count"] == 2
         corrected1, corrected2 = result["corrected_points"]
         assert corrected1[0] == pytest.approx(1.0, abs=1e-6)
@@ -148,8 +152,7 @@ class TestAlignHitsToReference:
         assert result["translation_summary"]["frame_count"] == 0
 
     def test_frame_translations_in_output(self):
-        hit = make_hit(1.0, 0.0, 0.0, noise_x=0.5, noise_y=0.0, noise_z=0.0,
-                       frame=3)
+        hit = make_hit(1.0, 0.0, 0.0, noise_x=0.5, noise_y=0.0, noise_z=0.0, frame=3)
         result = align_hits_to_reference([hit], use_noisy_measurements=True)
         assert "3" in result["frame_translations"]
 
@@ -158,29 +161,36 @@ class TestAlignHitsToReference:
 # align_hits_blind
 # ---------------------------------------------------------------------------
 
+
 class TestAlignHitsBlind:
+    """Tests use method="legacy_translation" to exercise the translation logic
+    with small point counts.  The default open3d_icp method requires
+    min_points_per_frame=30 before it applies any correction, so it would
+    silently produce zero translations for the small synthetic frames used here.
+    """
+
     def test_single_frame_no_correction(self):
         """First frame is always the anchor — no translation applied."""
         hits = [make_hit(1.0, 0.0, 0.0, frame=0) for _ in range(3)]
-        result = align_hits_blind(hits)
+        result = align_hits_blind(hits, method="legacy_translation")
         # All corrected points should equal original locations
         for pt in result["corrected_points"]:
             assert pt[0] == pytest.approx(1.0)
 
     def test_two_frames_second_corrected_toward_first(self):
-        """Frame 1 shifted by +5 in X; blind ICP applies a correction.
-
-        ICP aligns frame 1 onto frame 0 using nearest-neighbour correspondences.
-        With two evenly spaced points, the estimated correction is the median of
-        residuals.  We verify that the translation is non-zero and reduces the
-        centroid error.
-        """
-        frame0_hits = [make_hit(0.0, 0.0, 0.0, frame=0),
-                       make_hit(1.0, 0.0, 0.0, frame=0)]
-        frame1_hits = [make_hit(5.0, 0.0, 0.0, frame=1),
-                       make_hit(6.0, 0.0, 0.0, frame=1)]
-        result = align_hits_blind(frame0_hits + frame1_hits)
-        # The accumulated translation for frame 1 should be negative X (toward frame 0)
+        """Frame 1 shifted by +5 in X; legacy translation applies a correction."""
+        frame0_hits = [
+            make_hit(0.0, 0.0, 0.0, frame=0),
+            make_hit(1.0, 0.0, 0.0, frame=0),
+        ]
+        frame1_hits = [
+            make_hit(5.0, 0.0, 0.0, frame=1),
+            make_hit(6.0, 0.0, 0.0, frame=1),
+        ]
+        result = align_hits_blind(
+            frame0_hits + frame1_hits, method="legacy_translation"
+        )
+        # The translation for frame 1 should be negative X (toward frame 0)
         t1 = result["frame_translations"]["1"]
         assert t1[0] < 0, "Frame 1 correction should be negative X"
         # Corrected centroid of frame 1 should be closer to frame 0 centroid (0.5)
@@ -195,6 +205,7 @@ class TestAlignHitsBlind:
         result = align_hits_blind(
             frame0 + frame1,
             max_plausible_translation_m=5.0,
+            method="legacy_translation",
         )
         # Frame 1 point should be uncorrected (remains at 200)
         pt1 = result["corrected_points"][1]
@@ -202,20 +213,22 @@ class TestAlignHitsBlind:
 
     def test_frame_count_in_summary(self):
         hits = [make_hit(0.0, 0.0, 0.0, frame=i) for i in range(4)]
-        result = align_hits_blind(hits)
+        result = align_hits_blind(hits, method="legacy_translation")
         assert result["translation_summary"]["frame_count"] == 4
 
     def test_alignment_mode_label(self):
-        result = align_hits_blind([make_hit(0.0, 0.0, 0.0, frame=0)])
+        result = align_hits_blind(
+            [make_hit(0.0, 0.0, 0.0, frame=0)], method="legacy_translation"
+        )
         assert "blind" in result["alignment_mode"]
 
     def test_empty_hits(self):
-        result = align_hits_blind([])
+        result = align_hits_blind([], method="legacy_translation")
         assert result["corrected_points"] == []
 
     def test_accumulated_translations_in_output(self):
         hits = [make_hit(float(i), 0.0, 0.0, frame=i) for i in range(3)]
-        result = align_hits_blind(hits)
+        result = align_hits_blind(hits, method="legacy_translation")
         # Keys are string frame numbers
         assert "0" in result["frame_translations"]
         assert "1" in result["frame_translations"]
