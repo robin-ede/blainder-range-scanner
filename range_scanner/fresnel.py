@@ -29,19 +29,21 @@ Apr 2020
 
 import numpy as np
 
-__all__ = ('brewster',
-           'critical',
-           'r_par_amplitude',
-           'r_per_amplitude',
-           't_par_amplitude',
-           't_per_amplitude',
-           'R_par',
-           'R_per',
-           'T_par',
-           'T_per',
-           'R_unpolarized',
-           'T_unpolarized'
-           )
+__all__ = (
+    "brewster",
+    "critical",
+    "r_par_amplitude",
+    "r_per_amplitude",
+    "t_par_amplitude",
+    "t_per_amplitude",
+    "R_par",
+    "R_per",
+    "T_par",
+    "T_per",
+    "R_unpolarized",
+    "T_unpolarized",
+)
+
 
 def brewster(m, n_i=1):
     """
@@ -66,7 +68,7 @@ def critical(m, n_i=1):
     Returns:
         Critical angle from normal to surface    [radians]
     """
-    return np.arcsin(m/n_i)
+    return np.arcsin(m / n_i)
 
 
 def r_par_amplitude(m, theta_i, n_i=1):
@@ -89,10 +91,10 @@ def r_par_amplitude(m, theta_i, n_i=1):
     Returns:
         reflected fraction of parallel field    [-]
     """
-    m2 = (m/n_i)**2
+    m2 = (m / n_i) ** 2
     c = m2 * np.cos(theta_i)
     s = np.sin(theta_i)
-    d = np.sqrt(m2 - s * s, dtype=np.complex) # = m*cos(theta_t)
+    d = np.sqrt(m2 - s * s, dtype=np.complex128)  # = m*cos(theta_t)
     if m.imag == 0:  # choose right branch for dielectrics
         d = np.conjugate(d)
     rp = (c - d) / (c + d)
@@ -119,10 +121,10 @@ def r_per_amplitude(m, theta_i, n_i=1):
     Returns:
         reflected fraction of perpendicular field [-]
     """
-    m2 = (m/n_i)**2
+    m2 = (m / n_i) ** 2
     c = np.cos(theta_i)
     s = np.sin(theta_i)
-    d = np.sqrt(m2 - s * s, dtype=np.complex) # = m*cos(theta_t)
+    d = np.sqrt(m2 - s * s, dtype=np.complex128)  # = m*cos(theta_t)
     if m.imag == 0:  # choose right branch for dielectrics
         d = np.conjugate(d)
     rs = (c - d) / (c + d)
@@ -149,13 +151,13 @@ def t_par_amplitude(m, theta_i, n_i=1):
     Returns:
         transmitted fraction of parallel field                [-]
     """
-    m2 = (m/n_i)**2
+    m2 = (m / n_i) ** 2
     c = np.cos(theta_i)
     s = np.sin(theta_i)
-    d = np.sqrt(m2 - s * s, dtype=np.complex) # = m*cos(theta_t)
+    d = np.sqrt(m2 - s * s, dtype=np.complex128)  # = m*cos(theta_t)
     if m.imag == 0:  # choose right branch for dielectrics
         d = np.conjugate(d)
-    tp = 2 * c * (m/n_i) / (m2 * c + d)
+    tp = 2 * c * (m / n_i) / (m2 * c + d)
     return np.real_if_close(tp)
 
 
@@ -179,13 +181,13 @@ def t_per_amplitude(m, theta_i, n_i=1):
     Returns:
         transmitted fraction of perpendicular field [-]
     """
-    m2 = (m/n_i)**2
+    m2 = (m / n_i) ** 2
     c = np.cos(theta_i)
     s = np.sin(theta_i)
-    d = np.sqrt(m2 - s * s, dtype=np.complex) # = m*cos(theta_t)
+    d = np.sqrt(m2 - s * s, dtype=np.complex128)  # = m*cos(theta_t)
     if m.imag == 0:  # choose right branch for dielectrics
         d = np.conjugate(d)
-    ts = 2 * d / (m/n_i)/ (c + d)
+    ts = 2 * d / (m / n_i) / (c + d)
     return np.real_if_close(ts)
 
 
@@ -208,7 +210,7 @@ def R_par(m, theta_i, n_i=1):
     Returns:
         reflected fraction of parallel-polarized irradiance [-]
     """
-    return abs(r_par_amplitude(m, theta_i, n_i))**2
+    return abs(r_par_amplitude(m, theta_i, n_i)) ** 2
 
 
 def R_per(m, theta_i, n_i=1):
@@ -231,7 +233,7 @@ def R_per(m, theta_i, n_i=1):
     Returns:
         reflected fraction of perpendicular-polarized irradiance [-]
     """
-    return abs(r_per_amplitude(m, theta_i, n_i))**2
+    return abs(r_per_amplitude(m, theta_i, n_i)) ** 2
 
 
 def T_par(m, theta_i, n_i=1):
@@ -253,12 +255,12 @@ def T_par(m, theta_i, n_i=1):
     Returns:
         transmitted fraction of parallel-polarized irradiance [-]
     """
-    m2 = (m/n_i)**2
+    m2 = (m / n_i) ** 2
     c = np.cos(theta_i)
     s = np.sin(theta_i)
-    d = np.sqrt(m2 - s * s, dtype=np.complex)
-    tp = 2 * c * (m/n_i) / (m2 * c + d)
-    return np.abs(d / c * abs(tp)**2)
+    d = np.sqrt(m2 - s * s, dtype=np.complex128)
+    tp = 2 * c * (m / n_i) / (m2 * c + d)
+    return np.abs(d / c * abs(tp) ** 2)
 
 
 def T_per(m, theta_i, n_i=1):
@@ -281,12 +283,12 @@ def T_per(m, theta_i, n_i=1):
     Returns:
         transmitted fraction of perpendicular-polarized irradiance [-]
     """
-    m2 = (m/n_i)**2
+    m2 = (m / n_i) ** 2
     c = np.cos(theta_i)
     s = np.sin(theta_i)
-    d = np.sqrt(m2 - s * s, dtype=np.complex)
+    d = np.sqrt(m2 - s * s, dtype=np.complex128)
     ts = 2 * c / (c + d)
-    return np.abs(d / c * abs(ts)**2)
+    return np.abs(d / c * abs(ts) ** 2)
 
 
 def R_unpolarized(m, theta_i, n_i=1):
