@@ -26,22 +26,23 @@ import sys
 # Matplotlib import guard
 # ---------------------------------------------------------------------------
 
+
 def _get_plt():
     try:
         import matplotlib
+
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
+
         return plt
     except ImportError:
-        sys.exit(
-            "matplotlib is required for visualisation: "
-            "pip install matplotlib"
-        )
+        sys.exit("matplotlib is required for visualisation: pip install matplotlib")
 
 
 def _get_np():
     try:
         import numpy as np
+
         return np
     except ImportError:
         sys.exit("numpy is required: pip install numpy")
@@ -50,6 +51,7 @@ def _get_np():
 # ---------------------------------------------------------------------------
 # Data helpers
 # ---------------------------------------------------------------------------
+
 
 def _load_report(path):
     with open(path, "r", encoding="utf-8") as fh:
@@ -93,6 +95,7 @@ def _rmse_stages(report):
 # Plot 1 — RMSE comparison bar chart
 # ---------------------------------------------------------------------------
 
+
 def plot_rmse_comparison(report, output_path, title=None):
     plt = _get_plt()
 
@@ -101,31 +104,35 @@ def plot_rmse_comparison(report, output_path, title=None):
         print("  [skip] No RMSE data found — RMSE chart not generated.")
         return None
 
-    threshold = float(
-        report.get("acceptance", {}).get("rmse_threshold_m", 0.15)
-    )
+    threshold = float(report.get("acceptance", {}).get("rmse_threshold_m", 0.15))
 
-    labels  = [s[0] for s in stages]
-    values  = [s[1] for s in stages]
+    labels = [s[0] for s in stages]
+    values = [s[1] for s in stages]
     is_post = [s[2] for s in stages]
 
     colors = []
     for v, post in zip(values, is_post):
         if not post:
-            colors.append("#5b8db8")          # blue  — pre-fusion baseline
+            colors.append("#5b8db8")  # blue  — pre-fusion baseline
         elif v <= threshold:
-            colors.append("#4caf50")          # green — passes threshold
+            colors.append("#4caf50")  # green — passes threshold
         else:
-            colors.append("#e57373")          # red   — fails threshold
+            colors.append("#e57373")  # red   — fails threshold
 
     fig, ax = plt.subplots(figsize=(max(8, len(stages) * 1.5), 5))
     bars = ax.bar(
-        range(len(labels)), values,
-        color=colors, edgecolor="white", linewidth=0.8,
+        range(len(labels)),
+        values,
+        color=colors,
+        edgecolor="white",
+        linewidth=0.8,
     )
 
     ax.axhline(
-        y=threshold, color="#f39c12", linestyle="--", linewidth=1.5,
+        y=threshold,
+        color="#f39c12",
+        linestyle="--",
+        linewidth=1.5,
         label="Pass threshold (%.3f m)" % threshold,
     )
 
@@ -135,7 +142,9 @@ def plot_rmse_comparison(report, output_path, title=None):
             bar.get_x() + bar.get_width() / 2.0,
             v + max(values) * 0.012,
             "%.4f" % v,
-            ha="center", va="bottom", fontsize=8,
+            ha="center",
+            va="bottom",
+            fontsize=8,
         )
 
     ax.set_xticks(range(len(labels)))
@@ -152,14 +161,19 @@ def plot_rmse_comparison(report, output_path, title=None):
         meets = er.get("meets_80pct_reduction", False)
         ann_color = "#4caf50" if meets else "#e57373"
         ax.annotate(
-            "Error reduction: %.1f%%  (%s)" % (
-                reduction_pct, "PASS" if meets else "FAIL"
-            ),
-            xy=(0.98, 0.97), xycoords="axes fraction",
-            ha="right", va="top", fontsize=9, color=ann_color,
+            "Error reduction: %.1f%%  (%s)"
+            % (reduction_pct, "PASS" if meets else "FAIL"),
+            xy=(0.98, 0.97),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=9,
+            color=ann_color,
             bbox=dict(
                 boxstyle="round,pad=0.3",
-                facecolor="white", edgecolor=ann_color, alpha=0.85,
+                facecolor="white",
+                edgecolor=ann_color,
+                alpha=0.85,
             ),
         )
 
@@ -173,9 +187,10 @@ def plot_rmse_comparison(report, output_path, title=None):
 # Plot 2 — Reprojection error heatmap
 # ---------------------------------------------------------------------------
 
+
 def plot_reprojection_heatmap(report, output_path, title=None):
     plt = _get_plt()
-    np  = _get_np()
+    np = _get_np()
 
     samples = _get_nested(report, ["post_processing_fusion", "spatial_error_samples"])
     if not samples:
@@ -188,26 +203,24 @@ def plot_reprojection_heatmap(report, output_path, title=None):
     arr = np.asarray(samples, dtype=float)  # shape (N, 4): x, y, z, distance
     xs, ys, ds = arr[:, 0], arr[:, 1], arr[:, 3]
 
-    n_cells  = 60
-    x_edges  = np.linspace(xs.min(), xs.max(), n_cells + 1)
-    y_edges  = np.linspace(ys.min(), ys.max(), n_cells + 1)
+    n_cells = 60
+    x_edges = np.linspace(xs.min(), xs.max(), n_cells + 1)
+    y_edges = np.linspace(ys.min(), ys.max(), n_cells + 1)
 
-    grid_sum   = np.zeros((n_cells, n_cells), dtype=float)
+    grid_sum = np.zeros((n_cells, n_cells), dtype=float)
     grid_count = np.zeros((n_cells, n_cells), dtype=int)
 
     xi = np.clip(np.digitize(xs, x_edges) - 1, 0, n_cells - 1)
     yi = np.clip(np.digitize(ys, y_edges) - 1, 0, n_cells - 1)
 
     for i, j, d in zip(xi, yi, ds):
-        grid_sum[j, i]   += d
+        grid_sum[j, i] += d
         grid_count[j, i] += 1
 
     with np.errstate(invalid="ignore"):
         grid_mean = np.where(grid_count > 0, grid_sum / grid_count, np.nan)
 
-    threshold = float(
-        report.get("acceptance", {}).get("rmse_threshold_m", 0.15)
-    )
+    threshold = float(report.get("acceptance", {}).get("rmse_threshold_m", 0.15))
     vmax = float(
         max(
             np.nanmax(grid_mean) if not np.all(np.isnan(grid_mean)) else threshold,
@@ -219,8 +232,7 @@ def plot_reprojection_heatmap(report, output_path, title=None):
     im = ax.imshow(
         grid_mean,
         origin="lower",
-        extent=[float(xs.min()), float(xs.max()),
-                float(ys.min()), float(ys.max())],
+        extent=[float(xs.min()), float(xs.max()), float(ys.min()), float(ys.max())],
         aspect="auto",
         cmap="RdYlGn_r",
         vmin=0.0,
@@ -231,26 +243,39 @@ def plot_reprojection_heatmap(report, output_path, title=None):
     cb = plt.colorbar(im, ax=ax)
     cb.set_label("Mean surface distance error (m)")
     # Mark threshold on colour bar
-    cb.ax.axhline(y=threshold / vmax, color="black", linestyle="--", linewidth=1.2,
-                  transform=cb.ax.transAxes)
+    threshold_y = threshold / vmax
+    cb.ax.plot(
+        [0.0, 1.0],
+        [threshold_y, threshold_y],
+        color="black",
+        linestyle="--",
+        linewidth=1.2,
+        transform=cb.ax.transAxes,
+    )
     cb.ax.text(
-        1.08, threshold / vmax,
+        1.08,
+        threshold_y,
         "%.3f m" % threshold,
         transform=cb.ax.transAxes,
-        va="center", fontsize=7,
+        va="center",
+        fontsize=7,
     )
 
     ax.set_xlabel("X (m)")
     ax.set_ylabel("Y (m)")
     ax.set_title(
-        title or "Reprojection Error Heatmap\n(post-fusion · mean surface distance per cell)"
+        title
+        or "Reprojection Error Heatmap\n(post-fusion · mean surface distance per cell)"
     )
 
     ax.text(
-        0.01, 0.99,
+        0.01,
+        0.99,
         "%d points" % len(samples),
         transform=ax.transAxes,
-        va="top", fontsize=7, color="white",
+        va="top",
+        fontsize=7,
+        color="white",
         bbox=dict(facecolor="black", alpha=0.5, pad=2),
     )
 
@@ -264,46 +289,58 @@ def plot_reprojection_heatmap(report, output_path, title=None):
 # Plot 3 — Depth distribution histogram
 # ---------------------------------------------------------------------------
 
+
 def plot_depth_histogram(report, output_path, title=None):
     plt = _get_plt()
 
     dist_data = report.get("depth_distribution_comparison")
     if not dist_data or dist_data.get("status") != "computed":
-        print("  [skip] No depth_distribution_comparison data — histogram not generated.")
+        print(
+            "  [skip] No depth_distribution_comparison data — histogram not generated."
+        )
         return None
 
-    syn_hist   = dist_data.get("synthetic_histogram", {})
-    ref_hist   = dist_data.get("reference_histogram", {})
+    syn_hist = dist_data.get("synthetic_histogram", {})
+    ref_hist = dist_data.get("reference_histogram", {})
     syn_density = syn_hist.get("density", [])
     ref_density = ref_hist.get("density", [])
-    bin_edges   = syn_hist.get("bin_edges", [])
+    bin_edges = syn_hist.get("bin_edges", [])
 
     if not syn_density or not bin_edges:
         print("  [skip] Incomplete histogram data — histogram not generated.")
         return None
 
     bin_centers = [
-        (bin_edges[i] + bin_edges[i + 1]) / 2.0
-        for i in range(len(bin_edges) - 1)
+        (bin_edges[i] + bin_edges[i + 1]) / 2.0 for i in range(len(bin_edges) - 1)
     ]
     width = bin_edges[1] - bin_edges[0]
 
     fig, ax = plt.subplots(figsize=(9, 5))
 
     ax.bar(
-        bin_centers, syn_density,
-        width=width * 0.45, align="center",
+        bin_centers,
+        syn_density,
+        width=width * 0.45,
+        align="center",
         label="Synthetic",
-        color="#5b8db8", alpha=0.85, edgecolor="white", linewidth=0.5,
+        color="#5b8db8",
+        alpha=0.85,
+        edgecolor="white",
+        linewidth=0.5,
     )
 
     if ref_density:
         shifted = [c + width * 0.45 for c in bin_centers]
         ax.bar(
-            shifted, ref_density,
-            width=width * 0.45, align="center",
+            shifted,
+            ref_density,
+            width=width * 0.45,
+            align="center",
             label="Reference (real-world)",
-            color="#ff7043", alpha=0.85, edgecolor="white", linewidth=0.5,
+            color="#ff7043",
+            alpha=0.85,
+            edgecolor="white",
+            linewidth=0.5,
         )
 
     ax.set_xlabel("Depth (m)")
@@ -312,30 +349,36 @@ def plot_depth_histogram(report, output_path, title=None):
     ax.legend(fontsize=9)
 
     # KS annotation
-    ks        = dist_data.get("ks_statistic")
+    ks = dist_data.get("ks_statistic")
     ks_thresh = float(dist_data.get("ks_threshold", 0.15))
     passes_ks = dist_data.get("passes_ks_threshold")
-    max_dev   = dist_data.get("max_bin_deviation")
+    max_dev = dist_data.get("max_bin_deviation")
     passes_bd = dist_data.get("passes_bin_deviation_threshold")
 
     if ks is not None:
         ks_color = "#4caf50" if passes_ks else "#e57373"
-        lines = ["KS stat = %.4f  (threshold %.2f)  — %s" % (
-            ks, ks_thresh, "PASS" if passes_ks else "FAIL"
-        )]
+        lines = [
+            "KS stat = %.4f  (threshold %.2f)  — %s"
+            % (ks, ks_thresh, "PASS" if passes_ks else "FAIL")
+        ]
         if max_dev is not None:
             lines.append(
-                "Max bin deviation = %.3f  (threshold 0.10)  — %s" % (
-                    max_dev, "PASS" if passes_bd else "FAIL"
-                )
+                "Max bin deviation = %.3f  (threshold 0.10)  — %s"
+                % (max_dev, "PASS" if passes_bd else "FAIL")
             )
         ax.annotate(
             "\n".join(lines),
-            xy=(0.98, 0.96), xycoords="axes fraction",
-            ha="right", va="top", fontsize=8, color=ks_color,
+            xy=(0.98, 0.96),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=8,
+            color=ks_color,
             bbox=dict(
                 boxstyle="round,pad=0.35",
-                facecolor="white", edgecolor=ks_color, alpha=0.85,
+                facecolor="white",
+                edgecolor=ks_color,
+                alpha=0.85,
             ),
         )
 
@@ -349,6 +392,7 @@ def plot_depth_histogram(report, output_path, title=None):
 # Orchestration
 # ---------------------------------------------------------------------------
 
+
 def visualize_report(report_path, output_dir=None):
     report = _load_report(report_path)
 
@@ -356,7 +400,7 @@ def visualize_report(report_path, output_dir=None):
         output_dir = os.path.dirname(os.path.abspath(report_path))
     os.makedirs(output_dir, exist_ok=True)
 
-    stem          = os.path.splitext(os.path.basename(report_path))[0]
+    stem = os.path.splitext(os.path.basename(report_path))[0]
     scenario_name = report.get("scenario", {}).get("data_file_name", stem)
 
     print("Visualizing: %s" % report_path)
@@ -364,7 +408,8 @@ def visualize_report(report_path, output_dir=None):
 
     rmse_path = os.path.join(output_dir, "%s_rmse_comparison.png" % stem)
     result = plot_rmse_comparison(
-        report, rmse_path,
+        report,
+        rmse_path,
         title="RMSE by Stage — %s" % scenario_name,
     )
     if result:
@@ -373,7 +418,8 @@ def visualize_report(report_path, output_dir=None):
 
     heatmap_path = os.path.join(output_dir, "%s_error_heatmap.png" % stem)
     result = plot_reprojection_heatmap(
-        report, heatmap_path,
+        report,
+        heatmap_path,
         title="Error Heatmap — %s" % scenario_name,
     )
     if result:
@@ -382,7 +428,8 @@ def visualize_report(report_path, output_dir=None):
 
     hist_path = os.path.join(output_dir, "%s_depth_histogram.png" % stem)
     result = plot_depth_histogram(
-        report, hist_path,
+        report,
+        hist_path,
         title="Depth Distribution — %s" % scenario_name,
     )
     if result:
@@ -408,10 +455,7 @@ def main():
     parser.add_argument(
         "--output-dir",
         default=None,
-        help=(
-            "Directory for output PNGs. "
-            "Defaults to each report's own directory."
-        ),
+        help=("Directory for output PNGs. Defaults to each report's own directory."),
     )
     args = parser.parse_args()
 

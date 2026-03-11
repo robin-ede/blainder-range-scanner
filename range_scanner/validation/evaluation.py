@@ -187,7 +187,7 @@ def evaluate_points_against_targets(
                 )
 
     if spatial_samples is not None and len(spatial_samples) > max_spatial_samples:
-        step = max(1, len(spatial_samples) // max_spatial_samples)
+        step = max(1, math.ceil(len(spatial_samples) / max_spatial_samples))
         spatial_samples = spatial_samples[::step]
 
     metrics = _metric_summary_from_values(distances)
