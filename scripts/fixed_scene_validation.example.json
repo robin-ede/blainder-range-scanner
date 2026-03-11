@@ -29,7 +29,7 @@
     "joinMeshes": false
   },
   "primary_defaults": {
-    "scannerObject": "Camera",
+    "scannerObject": "camera",
     "scannerType": "rotating",
     "fovX": 30.0,
     "fovY": 40.0,
@@ -43,7 +43,7 @@
     "maxReflectionDepth": 10
   },
   "secondary_defaults": {
-    "scannerObject": "Camera.001",
+    "scannerObject": "camera.001",
     "scannerType": "sideScan",
     "maxDistance": 100.0,
     "fovSonar": 135.0,

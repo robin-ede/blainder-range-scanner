@@ -14,6 +14,11 @@ if REPO_ROOT not in sys.path:
 import range_scanner
 
 
+def ensure_range_scanner_registered():
+    if not hasattr(bpy.types.Scene, "scannerProperties"):
+        range_scanner.register()
+
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(
         description="Run one fixed-scene multi-sensor validation trial."
@@ -37,6 +42,7 @@ def main(argv):
     args = parse_args(argv)
     trial = load_config(args.config)
 
+    ensure_range_scanner_registered()
     ensure_output_dir(trial)
 
     result = range_scanner.ui.user_interface.scan_multi_sensor(

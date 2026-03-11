@@ -128,6 +128,56 @@ In Blender:
 
 For older Blender versions, see the respective branches linked above. The installation process uses the legacy add-on format with `bl_info`.
 
+### Docker (Headless Full Pipeline)
+
+This repository now includes a Docker-based, headless validation environment for running the full scripted pipeline without relying on a host Blender install. The container is pinned to Blender `5.0.1`, matching the version installed during development.
+
+Build the image from the repository root:
+
+```bash
+docker build --platform linux/amd64 -t blainder-range-scanner:blender-5.0.1 .
+```
+
+Run the canonical fixed-scene validation workflow:
+
+```bash
+docker run --rm \
+  -v "$PWD":/workspace \
+  blainder-range-scanner:blender-5.0.1 \
+  run-fixed-scene \
+  --scene /workspace/example_scenes/sonar_example.blend \
+  --config /workspace/scripts/fixed_scene_validation.example.json
+```
+
+Run the higher-level scripted workflows the same way:
+
+```bash
+docker run --rm -v "$PWD":/workspace blainder-range-scanner:blender-5.0.1 \
+  run-pose-noise --scene /workspace/generated_scenes/dual_sensor_scene_42.blend \
+  --config /workspace/scripts/pose_then_noise_validation.example.json
+
+docker run --rm -v "$PWD":/workspace blainder-range-scanner:blender-5.0.1 \
+  run-animated-path --base-scene /workspace/generated_scenes/dual_sensor_scene_42.blend \
+  --config /workspace/scripts/animated_path_validation.example.json
+```
+
+Generate PNG report visualizations inside the same container:
+
+```bash
+docker run --rm -v "$PWD":/workspace blainder-range-scanner:blender-5.0.1 \
+  visualize /workspace/path/to/report.json
+```
+
+Notes:
+
+- The container is intended for `linux/amd64` headless execution.
+- On Apple Silicon hosts, `linux/amd64` runs under emulation because Blender
+  only provides the Linux `x64` archive for this setup.
+- Mount a host output directory or the whole repo so generated JSON, CSV, and
+  PNG artifacts persist after the container exits.
+- Blender-style relative paths such as `//output` resolve relative to the
+  mounted `.blend` scene path inside the container.
+
 <br /><br />
 
 ## Dependencies
