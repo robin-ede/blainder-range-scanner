@@ -26,7 +26,10 @@ range_scanner-*.zip
 # local external/vendor clones
 external/
 
-# generated validation artifacts
+# local notes (never committed)
+notes/
+
+# generated validation artifacts (but keep committed test fixtures)
 *_report.json
 *_validation_summary.json
 *.metadata.json

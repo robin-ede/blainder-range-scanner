@@ -1,0 +1,360 @@
+{
+  "schema_version": 1,
+  "timestamp_utc": "2026-03-01T12:00:00+00:00",
+  "evaluation_mode": "bvh_surface",
+  "evaluated_point_variant": "noisy",
+  "aggregation_scope": "accumulated_over_animation_frames",
+  "status": "pass",
+  "status_description": "Pre-fusion combined accuracy accumulated over animation frames and evaluated against the ground-truth surface.",
+  "scenario": {
+    "data_file_name": "degraded_gnss_full_sea_state",
+    "data_file_path": "/tmp/output/degraded_animated_trials",
+    "frame_start": 1,
+    "frame_end": 30,
+    "frame_step": 1,
+    "single_ray": false,
+    "animation_enabled": true
+  },
+  "scanner_config": {
+    "primary": {
+      "object": "Camera",
+      "type": "rotating",
+      "location": [-12.0, 0.0, 6.5],
+      "rotation_euler_rad": [0.0, 0.0, 0.0]
+    },
+    "secondary": {
+      "object": "Camera.001",
+      "type": "sideScan",
+      "location": [-8.0, 0.0, -2.4],
+      "rotation_euler_rad": [0.0, 0.0, 0.0]
+    }
+  },
+  "noise_config": {
+    "add_noise": true,
+    "noise_type": "gaussian",
+    "mu": 0.0,
+    "sigma": 0.05,
+    "constant_noise": false,
+    "absolute_offset": 0.0,
+    "relative_offset": 0.0
+  },
+  "experiment_config": {
+    "noise_seed": 42,
+    "gnss_drift_m": 2.0,
+    "gnss_drift_heading_deg": 45.0,
+    "sea_state_amplitude_m": 0.5,
+    "sea_state_period_frames": 15,
+    "sea_state_phase_deg": 0.0
+  },
+  "ground_truth_source": "mesh_bvh",
+  "hit_counts": {
+    "total": 18420,
+    "valid": 17903,
+    "lidar": 9211,
+    "sonar": 8692
+  },
+  "pre_fusion_combined_metrics": {
+    "point_count": 17903,
+    "rmse": 2.143,
+    "mae": 1.872,
+    "median": 1.791,
+    "p95": 3.612,
+    "max": 5.204
+  },
+  "per_sensor_pre_fusion_metrics": {
+    "Camera": {
+      "point_count": 9211,
+      "rmse": 2.081,
+      "mae": 1.830,
+      "median": 1.755,
+      "p95": 3.498,
+      "max": 4.921
+    },
+    "Camera.001": {
+      "point_count": 8692,
+      "rmse": 2.209,
+      "mae": 1.917,
+      "median": 1.832,
+      "p95": 3.741,
+      "max": 5.204
+    }
+  },
+  "regional_pre_fusion_metrics": {
+    "above_water": {
+      "point_count": 9211,
+      "rmse": 2.081,
+      "mae": 1.830,
+      "median": 1.755,
+      "p95": 3.498,
+      "max": 4.921
+    },
+    "below_water": {
+      "point_count": 8692,
+      "rmse": 2.209,
+      "mae": 1.917,
+      "median": 1.832,
+      "p95": 3.741,
+      "max": 5.204
+    }
+  },
+  "medium_filtering": {
+    "water_surface_height": 0.0,
+    "above_water_count": 9211,
+    "below_water_count": 8692,
+    "unknown_count": 0
+  },
+  "degradation_modeling": {
+    "enabled": true,
+    "config": {
+      "gnss_drift_m": 2.0,
+      "gnss_drift_heading_deg": 45.0,
+      "sea_state_amplitude_m": 0.5,
+      "sea_state_period_frames": 15,
+      "sea_state_phase_deg": 0.0
+    },
+    "applied_hit_count": 17903
+  },
+  "alignment_correction": {
+    "method": "reference",
+    "metrics": {
+      "point_count": 17903,
+      "rmse": 0.048,
+      "mae": 0.039,
+      "median": 0.036,
+      "p95": 0.091,
+      "max": 0.187
+    },
+    "translation_summary": {
+      "min_translation_m": 0.12,
+      "max_translation_m": 2.063,
+      "mean_translation_m": 1.241,
+      "frames_corrected": 30
+    }
+  },
+  "blind_alignment_correction": {
+    "method": "open3d_icp",
+    "metrics": {
+      "point_count": 17903,
+      "rmse": 0.071,
+      "mae": 0.058,
+      "median": 0.052,
+      "p95": 0.138,
+      "max": 0.294
+    },
+    "registration_summary": {
+      "backend": "open3d_icp",
+      "frames_corrected": 30,
+      "frames_accepted_icp": 28,
+      "frames_accepted_coarse": 1,
+      "frames_carried_forward": 1
+    }
+  },
+  "post_processing_fusion": {
+    "method": "voxel_fusion",
+    "voxel_size": 0.05,
+    "metrics": {
+      "point_count": 6841,
+      "rmse": 0.134,
+      "mae": 0.108,
+      "median": 0.099,
+      "p95": 0.241,
+      "max": 0.418
+    },
+    "spatial_error_samples": [
+      [-5.2, -3.1, -1.8, 0.041],
+      [-4.8, -2.9, -1.6, 0.055],
+      [-4.1, -2.5, -1.4, 0.072],
+      [-3.7, -1.8, -1.2, 0.038],
+      [-3.2, -1.2, -0.9, 0.091],
+      [-2.8, -0.6, -0.7, 0.063],
+      [-2.3, 0.1, -0.5, 0.048],
+      [-1.9, 0.7, -0.3, 0.082],
+      [-1.4, 1.3, -0.1, 0.057],
+      [-0.9, 1.9, 0.1, 0.034],
+      [-5.5, -2.8, -1.9, 0.079],
+      [-4.5, -2.1, -1.5, 0.044],
+      [-3.9, -1.5, -1.1, 0.066],
+      [-3.4, -0.9, -0.8, 0.053],
+      [-2.9, -0.3, -0.6, 0.088],
+      [-2.4, 0.3, -0.4, 0.041],
+      [-1.8, 0.9, -0.2, 0.077],
+      [-1.3, 1.5, 0.0, 0.062],
+      [-0.8, 2.1, 0.2, 0.049],
+      [-0.3, 2.7, 0.4, 0.038]
+    ]
+  },
+  "blind_post_processing_fusion": {
+    "method": "voxel_fusion_blind_icp",
+    "voxel_size": 0.05,
+    "metrics": {
+      "point_count": 6814,
+      "rmse": 0.112,
+      "mae": 0.091,
+      "median": 0.083,
+      "p95": 0.201,
+      "max": 0.367
+    },
+    "spatial_error_samples": [
+      [-5.2, -3.1, -1.8, 0.031],
+      [-4.8, -2.9, -1.6, 0.044],
+      [-4.1, -2.5, -1.4, 0.058],
+      [-3.7, -1.8, -1.2, 0.029],
+      [-3.2, -1.2, -0.9, 0.073],
+      [-2.8, -0.6, -0.7, 0.051],
+      [-2.3, 0.1, -0.5, 0.038],
+      [-1.9, 0.7, -0.3, 0.067],
+      [-1.4, 1.3, -0.1, 0.045],
+      [-0.9, 1.9, 0.1, 0.027],
+      [-5.5, -2.8, -1.9, 0.062],
+      [-4.5, -2.1, -1.5, 0.035],
+      [-3.9, -1.5, -1.1, 0.054],
+      [-3.4, -0.9, -0.8, 0.041],
+      [-2.9, -0.3, -0.6, 0.069],
+      [-2.4, 0.3, -0.4, 0.033],
+      [-1.8, 0.9, -0.2, 0.059],
+      [-1.3, 1.5, 0.0, 0.048],
+      [-0.8, 2.1, 0.2, 0.037],
+      [-0.3, 2.7, 0.4, 0.025],
+      [-5.0, -3.3, -2.0, 0.083],
+      [-4.3, -2.7, -1.7, 0.047],
+      [-3.6, -2.0, -1.3, 0.061],
+      [-3.0, -1.4, -1.0, 0.036],
+      [-2.5, -0.8, -0.8, 0.078],
+      [-2.0, -0.2, -0.6, 0.055],
+      [-1.5, 0.5, -0.4, 0.042],
+      [-1.0, 1.1, -0.2, 0.071],
+      [-0.5, 1.7, 0.0, 0.053],
+      [0.0, 2.3, 0.2, 0.031]
+    ]
+  },
+  "medium_separated_reconstruction": {
+    "method": "medium_separated_voxel_fusion",
+    "metrics": {
+      "point_count": 7102,
+      "rmse": 0.119,
+      "mae": 0.097,
+      "median": 0.089,
+      "p95": 0.214,
+      "max": 0.381
+    }
+  },
+  "medium_height_grid_reconstruction": {
+    "method": "medium_height_grid",
+    "metrics": {
+      "point_count": 5930,
+      "rmse": 0.127,
+      "mae": 0.103,
+      "median": 0.094,
+      "p95": 0.228,
+      "max": 0.399
+    }
+  },
+  "corrected_grid_reconstruction": {
+    "method": "reference_corrected_grid",
+    "metrics": {
+      "point_count": 5844,
+      "rmse": 0.052,
+      "mae": 0.043,
+      "median": 0.039,
+      "p95": 0.098,
+      "max": 0.201
+    }
+  },
+  "blind_corrected_grid_reconstruction": {
+    "method": "blind_icp_corrected_grid",
+    "metrics": {
+      "point_count": 5831,
+      "rmse": 0.078,
+      "mae": 0.063,
+      "median": 0.057,
+      "p95": 0.149,
+      "max": 0.271
+    }
+  },
+  "depth_distribution_comparison": {
+    "status": "computed",
+    "synthetic_point_count": 8692,
+    "reference_point_count": 8500,
+    "scipy_available": true,
+    "ks_threshold": 0.15,
+    "ks_statistic": 0.087,
+    "ks_p_value": 0.214,
+    "passes_ks_threshold": true,
+    "bin_deviation_threshold": 0.10,
+    "max_bin_deviation": 0.063,
+    "bin_deviations": [0.021, 0.034, 0.018, 0.041, 0.063, 0.029, 0.015, 0.038, 0.027, 0.012],
+    "passes_bin_deviation_threshold": true,
+    "passes_all": true,
+    "synthetic_histogram": {
+      "bin_edges": [-20.5, -19.5, -18.5, -17.5, -16.5, -15.5, -14.5, -13.5, -12.5, -11.5, -10.5],
+      "counts": [312, 518, 874, 1203, 1547, 1612, 1421, 891, 214, 100],
+      "density": [0.036, 0.060, 0.101, 0.138, 0.178, 0.185, 0.163, 0.103, 0.025, 0.012]
+    },
+    "reference_histogram": {
+      "bin_edges": [-20.5, -19.5, -18.5, -17.5, -16.5, -15.5, -14.5, -13.5, -12.5, -11.5, -10.5],
+      "counts": [301, 494, 851, 1189, 1521, 1574, 1391, 862, 208, 109],
+      "density": [0.035, 0.058, 0.100, 0.140, 0.179, 0.185, 0.164, 0.101, 0.024, 0.013]
+    }
+  },
+  "error_reduction": {
+    "degraded_surface_rmse": 2.143,
+    "post_fusion_rmse": 0.112,
+    "positional_degradation_magnitude_m": 2.063,
+    "positional_baseline_threshold_m": 2.0,
+    "meets_positional_baseline_2m": true,
+    "error_reduction_pct": 94.77,
+    "meets_80pct_reduction": true,
+    "best_post_fusion_stage": "blind_post_processing_fusion",
+    "degraded_rmse": 2.143,
+    "meets_degraded_baseline_2m": true,
+    "peak_frame_degraded_rmse": 2.891,
+    "peak_frame_error_reduction_pct": 96.12,
+    "peak_frame_meets_80pct_reduction": true
+  },
+  "per_frame_degraded_rmse": {
+    "frame_1": 0.051,
+    "frame_5": 0.412,
+    "frame_10": 1.034,
+    "frame_15": 1.891,
+    "frame_20": 2.443,
+    "frame_25": 2.718,
+    "frame_30": 2.891
+  },
+  "technical_objectives": {
+    "TO4": {
+      "objective_id": "TO4",
+      "objective_description": "Demonstrate a degraded baseline >= 2.0 m and a post-fusion RMSE <= 0.15 m with at least 80% error reduction.",
+      "official_stage_key": "blind_post_processing_fusion",
+      "official_stage_label": "Blind aligned voxel fusion",
+      "alignment_backend": "open3d_icp",
+      "passes_backend_requirement": true,
+      "rmse_target_m": 0.15,
+      "passes_post_fusion_rmse_target": true,
+      "degraded_surface_rmse": 2.143,
+      "post_fusion_rmse": 0.112,
+      "positional_degradation_magnitude_m": 2.063,
+      "positional_baseline_threshold_m": 2.0,
+      "meets_positional_baseline_2m": true,
+      "error_reduction_pct": 94.77,
+      "meets_80pct_reduction": true,
+      "positional_error_reduction_pct": 94.57,
+      "positional_meets_80pct_reduction": true,
+      "passes_all": true
+    }
+  },
+  "performance": {
+    "wall_time_seconds": 187.4,
+    "wall_time_minutes": 3.1233,
+    "peak_memory_bytes": 1342177280,
+    "peak_memory_gb": 1.25,
+    "passes_time_threshold": true,
+    "passes_memory_threshold": true,
+    "time_threshold_minutes": 10.0,
+    "memory_threshold_gb": 8.0
+  },
+  "acceptance": {
+    "passes_rmse_threshold": true,
+    "rmse_threshold_m": 0.15
+  },
+  "warnings": []
+}
