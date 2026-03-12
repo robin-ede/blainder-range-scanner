@@ -11,7 +11,7 @@
     "enableAnimation": true,
     "frameStart": 1,
     "frameEnd": 236,
-    "frameStep": 5,
+    "frameStep": 1,
     "frameRate": 10,
     "noiseSeed": 42,
     "addNoise": true,

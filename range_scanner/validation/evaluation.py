@@ -165,7 +165,7 @@ def evaluate_points_against_targets(
     rmse_threshold=0.15,
     water_surface_height=None,
     store_spatial_samples=False,
-    max_spatial_samples=8000,
+    max_spatial_samples=50000,
 ):
     depsgraph = context.evaluated_depsgraph_get()
     trees = _build_bvh_trees(targets, depsgraph)

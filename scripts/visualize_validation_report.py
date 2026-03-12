@@ -209,7 +209,9 @@ def plot_reprojection_heatmap(report, output_path, title=None):
     arr = np.asarray(samples, dtype=float)  # shape (N, 4): x, y, z, distance
     xs, ys, ds = arr[:, 0], arr[:, 1], arr[:, 3]
 
-    n_cells = 60
+    # Adapt grid resolution to sample density: target ~6 pts/cell, clamped
+    # between 20 and 120 cells so the plot is neither blocky nor Swiss-cheese.
+    n_cells = int(np.clip(np.sqrt(len(samples) / 6.0), 20, 120))
     x_edges = np.linspace(xs.min(), xs.max(), n_cells + 1)
     y_edges = np.linspace(ys.min(), ys.max(), n_cells + 1)
 

@@ -117,9 +117,9 @@ python3 scripts/prepare_reference_depth_distribution.py convert \
 ### 2f. Run the validation
 
 ```bash
-python3 scripts/run_animated_path_validation.py \
+python3 scripts/run_fixed_scene_validation_batch.py \
     --blender "$BLENDER" \
-    --base-scene generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small/seabed_crop_300m_auto_fast.blend \
+    --scene generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small/seabed_crop_300m_auto_fast.blend \
     --config scripts/real_bathy_noaa_degraded_validation.json
 ```
 
