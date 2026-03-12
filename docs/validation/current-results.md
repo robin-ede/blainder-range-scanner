@@ -3,6 +3,11 @@
 This document summarizes what the repository currently demonstrates in practical
 terms, without assuming that the reader knows the codebase.
 
+> **Committed evidence lives in [`validation/`](../../validation/) at the repo
+> root** — reference data, live Blender reports, and demo plots.
+> [`REPRODUCING.md`](../../REPRODUCING.md) has step-by-step commands to
+> regenerate every result from scratch.
+
 ## What We Are Trying To Prove
 
 The project goal is to support a dual-sensor fusion pipeline for a company use

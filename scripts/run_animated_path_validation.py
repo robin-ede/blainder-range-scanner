@@ -367,6 +367,16 @@ def main():
     args = parse_args()
     config = load_json(args.config)
 
+    # Resolve referenceDepthFile relative to the config file's directory so
+    # configs can use relative paths and remain portable across machines.
+    config_dir = os.path.dirname(os.path.abspath(args.config))
+    validation_batch = config.get("validation_batch", {})
+    ref = validation_batch.get("common_defaults", {}).get("referenceDepthFile")
+    if ref and not os.path.isabs(ref):
+        validation_batch["common_defaults"]["referenceDepthFile"] = os.path.abspath(
+            os.path.join(config_dir, ref)
+        )
+
     animated_scene_dir = resolve_relative(args.base_scene, config["animated_scene_dir"])
     aggregate_dir = resolve_relative(args.base_scene, config["aggregate_summary_dir"])
     thresholds = config.get(

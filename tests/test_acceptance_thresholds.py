@@ -210,6 +210,43 @@ class TestTO5Performance:
 
 
 # ---------------------------------------------------------------------------
+# 6.1 — Point density check
+# ---------------------------------------------------------------------------
+
+
+class TestPointDensity:
+    """Data quality check 6.1: fused point cloud density integrated into main report."""
+
+    def test_point_density_block_present(self, report):
+        density = report.get("point_density")
+        assert isinstance(density, dict), (
+            "point_density block must be present in report"
+        )
+
+    def test_point_density_has_pts_per_m2(self, report):
+        val = _get(report, "point_density", "fused_pts_per_m2")
+        assert val is not None, "point_density.fused_pts_per_m2 must be present"
+        assert isinstance(val, (int, float)), (
+            "point_density.fused_pts_per_m2 must be numeric, got %r" % type(val)
+        )
+        assert val > 0, "point_density.fused_pts_per_m2 must be positive"
+
+    def test_point_density_passes_threshold(self, report):
+        flag = _get(report, "point_density", "passes_density_threshold")
+        assert flag is True, (
+            "point_density.passes_density_threshold must be True "
+            "(fused point cloud must have at least 1 pt/m²)"
+        )
+
+    def test_point_density_fused_count_matches_report(self, report):
+        density_count = _get(report, "point_density", "fused_point_count")
+        fusion_count = _get(report, "post_processing_fusion", "point_counts", "fused")
+        assert density_count is not None, "point_density.fused_point_count missing"
+        # The density block records fused_point_count from the same fusion step
+        assert density_count > 0, "point_density.fused_point_count must be positive"
+
+
+# ---------------------------------------------------------------------------
 # Report schema sanity
 # ---------------------------------------------------------------------------
 

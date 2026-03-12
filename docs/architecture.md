@@ -232,8 +232,39 @@ run_fixed_scene_validation_trial.py   ──► scan_multi_sensor() inside Blend
 
 Blender uses a right-handed coordinate system with Z-up. The sensor simulation
 and degradation models operate entirely within Blender world coordinates.
-The ICP alignment in `alignment.py` is constrained to **translation-only**
-(rotation is coerced to identity after ICP) to match the physical model of
-GNSS drift (which produces XY translation, not rotation). This ensures that
-the fusion pipeline does not introduce spurious rotational corrections that
-would be physically unjustified for the modelled degradation types.
+
+## ICP Alignment: Translation-Only Design
+
+The ICP alignment in `alignment.py` is constrained to **translation-only**.
+After each ICP level the rotation block of the 4×4 transformation is coerced
+back to the identity matrix via `_coerce_translation_transform()` (line 347),
+so only the translation vector `t = [dx, dy, dz]` is retained.
+
+**Why translation-only and not full 6-DOF ICP?**
+
+1. **The degradation model is translation-only.**  `degradation.py:_gnss_offset()`
+   adds a purely XY displacement that grows linearly with time; `_sea_state_offset()`
+   adds a Z-axis sinusoidal heave. Neither introduces any rotational component.
+   Allowing ICP to also recover rotation would mean fitting a degree of freedom
+   that has no physical counterpart in the modelled error sources.
+
+2. **Rotation would absorb real bathymetric signal.**  On a sloped or textured
+   seabed, point-to-point ICP will tend to resolve remaining residuals by tilting
+   the source cloud to match the target surface.  That tilt is indistinguishable
+   from a genuine heading change, so a full 6-DOF correction would silently
+   distort the recovered geometry rather than correct the sensor position.
+
+3. **Heading is held constant in the Blender animation path.**  The platform
+   follows a lawnmower or straight-push trajectory with fixed heading during
+   each frame interval.  Any apparent heading change between frames would
+   be an artefact of incomplete scan overlap, not actual vessel rotation.
+
+4. **Full 6-DOF would require heading-sensor fusion.**  Real-world blind
+   alignment of GNSS-drifted data without an IMU or compass reference cannot
+   reliably separate translational drift from platform rotation.  Making that
+   separation here would introduce false precision absent from the physical model.
+
+The practical consequence is that the blind-corrected RMSE metrics measure how
+well the pipeline recovers the **translational** component of positional
+degradation, which is the component the degradation model introduces and the
+component the charter's TO4 criterion targets.

@@ -35,3 +35,11 @@ notes/
 *.metadata.json
 generated_scenes/
 generated_scenes_multi_seed/
+
+# keep committed evidence under validation/ even though generic patterns above
+# would otherwise exclude .png, *_report.json, and .npy files
+!validation/
+!validation/**
+!validation/images/*.png
+!validation/reports/*_report.json
+!validation/reference_data/*.npy

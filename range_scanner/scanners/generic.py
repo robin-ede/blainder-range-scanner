@@ -1387,6 +1387,35 @@ def performMultiSensorScan(context, properties):
             "spatial_error_samples": fused_metrics.get("spatial_error_samples"),
         }
 
+        # Point density check (6.1): fused point cloud density in pts/m²
+        # computed from the XY bounding-box of the fused point array.
+        _fused_pts = fused_results["fused_points"]
+        _density_result = {"fused_point_count": int(fused_results["fused_point_count"])}
+        if len(_fused_pts) >= 4:
+            _xs = np.asarray([float(_p[0]) for _p in _fused_pts])
+            _ys = np.asarray([float(_p[1]) for _p in _fused_pts])
+            _bbox_area_m2 = float((max(_xs) - min(_xs)) * (max(_ys) - min(_ys)))
+            if _bbox_area_m2 > 0.0:
+                _density = float(len(_fused_pts)) / _bbox_area_m2
+                _density_threshold = (
+                    1.0  # minimum sanity floor, not a charter criterion
+                )
+                _density_result.update(
+                    {
+                        "fused_pts_per_m2": round(_density, 4),
+                        "bbox_area_m2": round(_bbox_area_m2, 2),
+                        "density_threshold_pts_per_m2": _density_threshold,
+                        "passes_density_threshold": _density >= _density_threshold,
+                    }
+                )
+            else:
+                _density_result["fused_pts_per_m2"] = None
+                _density_result["passes_density_threshold"] = None
+        else:
+            _density_result["fused_pts_per_m2"] = None
+            _density_result["passes_density_threshold"] = None
+        evaluation_results["point_density"] = _density_result
+
         reconstructed_results = fusion.reconstruct_medium_separated_map(
             allHits,
             above_water_voxel_size=0.04,
@@ -1801,7 +1830,11 @@ def performMultiSensorScan(context, properties):
                     else np.loadtxt(_abs_ref)
                 )
                 _ref_depths = np.asarray(_ref_depths, dtype=float).ravel()
-                # Synthetic depths: Z-coordinates of all hits (noisy if degraded)
+                # Synthetic depths: Z-coordinates of below-water hits only.
+                # Above-water LiDAR hits cluster near Z=0 and would dominate the
+                # histogram, producing a spurious KS failure when compared against
+                # a seabed-only reference distribution.  Filtering to below-water
+                # hits ensures the comparison is sonar-vs-reference (apples to apples).
                 _syn_depths = []
                 for _h in allHits:
                     _pt = (
@@ -1809,7 +1842,12 @@ def performMultiSensorScan(context, properties):
                         if (use_noisy_measurements and _h.noiseLocation is not None)
                         else _h.location
                     )
-                    _syn_depths.append(float(_pt.z))
+                    # Only include hits that are below the water surface
+                    if (
+                        water_surface_height is None
+                        or float(_pt.z) < water_surface_height
+                    ):
+                        _syn_depths.append(float(_pt.z))
                 _syn_depths = np.asarray(_syn_depths, dtype=float)
                 evaluation_results["depth_distribution_comparison"] = (
                     evaluation.compare_depth_distributions(_syn_depths, _ref_depths)
@@ -2038,9 +2076,12 @@ def runSonarScanWithCapture(
         lastFrame = bpy.context.scene.frame_current
         frameStep = 1
 
-    totalNumberOfRays = (
-        xRange.size * yRange.size * int((lastFrame - firstFrame + 1) / frameStep)
-    )
+    # Use ceiling division to match the actual frame count produced by
+    # range(firstFrame, lastFrame + 1, frameStep), which can be one frame
+    # more than floor((lastFrame - firstFrame + 1) / frameStep) when the
+    # range does not divide evenly.
+    _actual_frame_count = len(range(firstFrame, lastFrame + 1, frameStep))
+    totalNumberOfRays = xRange.size * yRange.size * _actual_frame_count
     scannedValues = np.full(totalNumberOfRays, None, dtype=object)
 
     trees = {}

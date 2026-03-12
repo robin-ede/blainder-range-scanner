@@ -27,7 +27,17 @@ def parse_args():
 
 def load_batch_config(config_path):
     with open(config_path, "r", encoding="utf-8") as input_file:
-        return json.load(input_file)
+        config = json.load(input_file)
+    # Resolve referenceDepthFile relative to the config file's directory so
+    # configs can use relative paths (e.g. "../../docs/validation/foo.npy") and
+    # remain portable across machines.
+    config_dir = os.path.dirname(os.path.abspath(config_path))
+    ref = config.get("common_defaults", {}).get("referenceDepthFile")
+    if ref and not os.path.isabs(ref):
+        config["common_defaults"]["referenceDepthFile"] = os.path.abspath(
+            os.path.join(config_dir, ref)
+        )
+    return config
 
 
 def build_trial(batch_config, trial):

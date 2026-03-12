@@ -1,0 +1,73 @@
+{
+  "common_defaults": {
+    "dataFilePath": "//output/noaa_cb_degraded_validation",
+    "referenceDepthFile": "../validation/reference_data/cb_noaa_reference_depths.npy",
+    "addMesh": false,
+    "exportCSV": false,
+    "exportLAS": true,
+    "exportHDF": false,
+    "exportPLY": false,
+    "exportSingleFrames": false,
+    "enableAnimation": true,
+    "frameStart": 1,
+    "frameEnd": 236,
+    "frameStep": 5,
+    "frameRate": 10,
+    "noiseSeed": 42,
+    "addNoise": true,
+    "noiseType": "gaussian",
+    "mu": 0.0,
+    "sigma": 0.03,
+    "debugLines": false,
+    "debugOutput": false,
+    "outputProgress": true,
+    "measureTime": true,
+    "singleRay": false,
+    "joinMeshes": false
+  },
+  "primary_defaults": {
+    "scannerObject": "Camera",
+    "scannerType": "rotating",
+    "fovX": 30.0,
+    "fovY": 40.0,
+    "xStepDegree": 0.2,
+    "yStepDegree": 0.33,
+    "rotationsPerSecond": 20.0,
+    "reflectivityLower": 0.0,
+    "distanceLower": 0.0,
+    "reflectivityUpper": 0.0,
+    "distanceUpper": 99999.9,
+    "maxReflectionDepth": 10
+  },
+  "secondary_defaults": {
+    "scannerObject": "Camera.001",
+    "scannerType": "sideScan",
+    "maxDistance": 100.0,
+    "fovSonar": 135.0,
+    "sonarStepDegree": 0.25,
+    "sonarMode3D": true,
+    "sonarKeepRotation": false,
+    "sourceLevel": 220.0,
+    "noiseLevel": 63.0,
+    "directivityIndex": 20.0,
+    "processingGain": 10.0,
+    "receptionThreshold": 10.0,
+    "simulateWaterProfile": false,
+    "surfaceHeight": 0.0
+  },
+  "water_profile": [],
+  "trials": [
+    {
+      "trial_name": "noaa_cb_baseline",
+      "common": {
+        "dataFileName": "noaa_cb_baseline",
+        "addNoise": false,
+        "gnssDriftMeters": 0.0,
+        "gnssDriftHeadingDegrees": 0.0,
+        "seaStateAmplitudeMeters": 0.0,
+        "seaStatePeriodFrames": 20,
+        "seaStatePhaseDegrees": 0.0
+      }
+    }
+  ]
+}
