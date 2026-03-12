@@ -6,22 +6,24 @@
 __pycache__/
 *.py[cod]
 
+# Blender scene files — committed examples in example_scenes/ are exempt
 *.blend
 *.blend1
 *.blend2
+!example_scenes/*.blend
 
 .vscode/settings.json
- 
+
+# large binary scan exports (can appear anywhere a scan runs)
 *.las
 *.hdf5
-*.ply
-*.csv
-*.png
-output*/
-*.xml
 
-*.zip
-range_scanner-*.zip
+# generated scene directories (large, reproducible, not source of truth)
+generated_scenes/
+generated_scenes_multi_seed/
+
+# scan output that lands inside example_scenes/output/ or generated_scenes/
+example_scenes/output/
 
 # local external/vendor clones
 external/
@@ -29,17 +31,6 @@ external/
 # local notes (never committed)
 notes/
 
-# generated validation artifacts (but keep committed test fixtures)
-*_report.json
-*_validation_summary.json
-*.metadata.json
-generated_scenes/
-generated_scenes_multi_seed/
-
-# keep committed evidence under validation/ even though generic patterns above
-# would otherwise exclude .png, *_report.json, and .npy files
-!validation/
-!validation/**
-!validation/images/*.png
-!validation/reports/*_report.json
-!validation/reference_data/*.npy
+# build artefacts
+*.zip
+range_scanner-*.zip
