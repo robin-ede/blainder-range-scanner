@@ -23,7 +23,7 @@ in [`docs/validation/`](../docs/validation/):
   summary of what is demonstrated
 
 For step-by-step commands to reproduce every result here from scratch, see
-[`REPRODUCING.md`](../REPRODUCING.md) at the repo root.
+[`REPRODUCING.md`](./REPRODUCING.md) in this directory.
 
 ---
 
@@ -47,7 +47,7 @@ generated_scenes/degraded_animated_paths/output/degraded_animated_trials/
   straight_push_degraded/degraded_gnss_full_sea_state_multi_sensor_report.json
 ```
 
-Re-run instructions are in `REPRODUCING.md` §3.
+Re-run instructions are in [`REPRODUCING.md`](./REPRODUCING.md) §3.
 
 ## images/
 
