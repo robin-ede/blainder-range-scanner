@@ -54,7 +54,7 @@ toy geometry.
 We can now:
 
 - extract real point clouds from Kongsberg `.all` survey files using the real
-  GitHub `pyall` reader
+  [`pyall`](https://github.com/guardiangeomatics/pyall) reader
 - normalize those points into reusable `.csv` / `.npy` outputs
 - build a local mesh patch from those real points
 - rescan that patch synthetically for direct point-cloud comparison

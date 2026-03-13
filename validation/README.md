@@ -38,16 +38,9 @@ For step-by-step commands to reproduce every result here from scratch, see
 | File | Charter item | Key result |
 |---|---|---|
 | `noaa_cb_distribution_validation_report.json` | TO3, D2 | KS=0.099 < 0.15 ✓, max\_bin\_dev=0.070 < 0.10 ✓, passes\_all=true |
+| `degraded_gnss_full_sea_state_multi_sensor_report.json` | TO4, TO5 | `technical_objectives.TO4.passes_all=true`; positional\_degradation=2.01 m ✓, post\_fusion\_rmse=0.129 m ✓, positional\_error\_reduction=93.6% ✓, wall\_time=2.07 min ✓, peak\_memory=0.31 GB ✓. *(Top-level `status: fail` is expected — it reflects the pre-fusion degraded RMSE, not the charter result.)* |
 
-The TO4 report (positional\_degradation=2.01 m, post\_fusion\_rmse=0.028 m,
-error\_reduction=93.3 %) is a large generated file and lives at:
-
-```
-generated_scenes/degraded_animated_paths/output/degraded_animated_trials/
-  straight_push_degraded/degraded_gnss_full_sea_state_multi_sensor_report.json
-```
-
-Re-run instructions are in [`REPRODUCING.md`](./REPRODUCING.md) §3.
+Re-run instructions are in [`REPRODUCING.md`](./REPRODUCING.md).
 
 ## images/
 

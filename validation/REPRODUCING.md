@@ -2,7 +2,7 @@
 
 This document provides step-by-step commands to reproduce every live Blender result
 used as charter validation evidence.
-Pre-generated output files are committed under `docs/validation/` and `validation/images/`
+Pre-generated output files are committed under `validation/reports/` and `validation/images/`
 so reviewers can inspect results without re-running Blender.
 
 ---
@@ -61,26 +61,39 @@ Key test classes and what they prove:
 **Pre-generated result:** `validation/reports/noaa_cb_distribution_validation_report.json`
 KS=0.099 (threshold 0.15) ✓, max\_bin\_dev=0.070 (threshold 0.10) ✓, passes\_all=true
 
-**To reproduce:**
+**To reproduce, define a working directory first:**
+
+```bash
+export BATHY_DIR="generated_scenes/real_bathy/chesapeake_300m"
+mkdir -p "$BATHY_DIR"
+```
 
 ### 2a. Obtain the NOAA Chesapeake Bay netCDF
 
-Download the M130 2017 survey from NOAA National Centers for Environmental Information
-and place it at:
+Use the included discovery script to locate and download the survey:
 
-```
-generated_scenes/animated_paths/output/real_bathy/chesapeake_bay_M130_2017.nc
+```bash
+python3 scripts/find_noaa_bathy_candidates.py \
+    --bbox-lon -76.35 -76.27 --bbox-lat 38.70 38.75 \
+    --year 2017 --format netcdf --download \
+    --output-dir "$BATHY_DIR"
+
+# Rename the downloaded .nc file to a known name:
+mv "$BATHY_DIR"/*.nc "$BATHY_DIR/chesapeake_bay_M130_2017.nc"
 ```
 
-(The exact file can be located via `scripts/find_noaa_bathy_candidates.py`.)
+The script queries the NOAA NCEI ArcGIS feature service for surveys matching the
+Chesapeake Bay 300 m crop footprint.
+If automated download is unavailable, search manually at
+`https://www.ncei.noaa.gov/maps/bathymetry/` for survey ID `M130` (2017,
+Chesapeake Bay) and place the netCDF at `$BATHY_DIR/chesapeake_bay_M130_2017.nc`.
 
 ### 2b. Build the 300 m crop OBJ + metadata
 
 ```bash
-mkdir -p generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small
 python3 scripts/processed_bathy_to_obj.py \
-    --input generated_scenes/animated_paths/output/real_bathy/chesapeake_bay_M130_2017.nc \
-    --output-dir generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small \
+    --input "$BATHY_DIR/chesapeake_bay_M130_2017.nc" \
+    --output-dir "$BATHY_DIR" \
     --center-lon -76.309411135 --center-lat 38.72346898 --size-m 300 \
     --prefix seabed_crop_300m
 ```
@@ -89,16 +102,16 @@ python3 scripts/processed_bathy_to_obj.py \
 
 ```bash
 $BLENDER --background --python scripts/import_obj_to_blender_scene.py -- \
-    --obj generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small/seabed_crop_300m.obj \
-    --output generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small/seabed_crop_300m.blend
+    --obj "$BATHY_DIR/seabed_crop_300m.obj" \
+    --output "$BATHY_DIR/seabed_crop_300m.blend"
 ```
 
 ### 2d. Add sensors to produce the scan-ready scene
 
 ```bash
 $BLENDER --background --python scripts/make_scan_ready_real_bathy_scene.py -- \
-    --input generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small/seabed_crop_300m.blend \
-    --output generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small/seabed_crop_300m_auto_fast.blend
+    --input "$BATHY_DIR/seabed_crop_300m.blend" \
+    --output "$BATHY_DIR/seabed_crop_300m_scan_ready.blend"
 ```
 
 ### 2e. Prepare reference depth array (already committed)
@@ -108,7 +121,7 @@ values extracted from the same netCDF crop.  To regenerate it:
 
 ```bash
 python3 scripts/prepare_reference_depth_distribution.py convert \
-    --input generated_scenes/animated_paths/output/real_bathy/chesapeake_bay_M130_2017.nc \
+    --input "$BATHY_DIR/chesapeake_bay_M130_2017.nc" \
     --format xyz \
     --output validation/reference_data/cb_noaa_reference_depths.npy \
     --min-depth -7.0 --max-depth 0.0
@@ -119,22 +132,22 @@ python3 scripts/prepare_reference_depth_distribution.py convert \
 ```bash
 python3 scripts/run_fixed_scene_validation_batch.py \
     --blender "$BLENDER" \
-    --scene generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small/seabed_crop_300m_auto_fast.blend \
+    --scene "$BATHY_DIR/seabed_crop_300m_scan_ready.blend" \
     --config scripts/real_bathy_noaa_degraded_validation.json
 ```
 
-Output report: `generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small/output/noaa_cb_degraded_validation/noaa_cb_baseline_multi_sensor_report.json`
+Output report written to `$BATHY_DIR/output/noaa_cb_baseline_multi_sensor_report.json`.
 
 Verify:
 
 ```bash
 python3 -c "
-import json
-r = json.load(open('generated_scenes/animated_paths/output/real_bathy/ld_11_04_cb_hacr_crop_small/output/noaa_cb_degraded_validation/noaa_cb_baseline_multi_sensor_report.json'))
+import json, os
+r = json.load(open(os.environ['BATHY_DIR'] + '/output/noaa_cb_baseline_multi_sensor_report.json'))
 dd = r['depth_distribution_comparison']
-print('ks_statistic:', dd['ks_statistic'])   # expect < 0.15
+print('ks_statistic:', dd['ks_statistic'])       # expect < 0.15
 print('max_bin_deviation:', dd['max_bin_deviation'])  # expect < 0.10
-print('passes_all:', dd['passes_all'])        # expect True
+print('passes_all:', dd['passes_all'])            # expect True
 "
 ```
 
@@ -142,44 +155,57 @@ print('passes_all:', dd['passes_all'])        # expect True
 
 ## 3. TO4 — Degradation → Blind-ICP fusion error reduction (live Blender)
 
-**Pre-generated result:** `generated_scenes/degraded_animated_paths/output/degraded_animated_trials/straight_push_degraded/degraded_gnss_full_sea_state_multi_sensor_report.json`
-positional\_degradation=2.01 m ✓, post\_fusion\_rmse=0.028 m ✓, error\_reduction=93.3% ✓
+**Pre-generated result:** `validation/reports/degraded_gnss_full_sea_state_multi_sensor_report.json`
+positional\_degradation=2.01 m ✓, post\_fusion\_rmse=0.129 m ✓, error\_reduction=93.6% ✓
+
+> **Note:** The top-level `"status": "fail"` in this report reflects the **pre-fusion**
+> degraded RMSE (0.41 m) failing the 0.15 m threshold — this is the intentional
+> degraded baseline that TO4 requires to be ≥ 2 m positional error.
+> The charter acceptance result is in `technical_objectives.TO4.passes_all`, which is `true`.
 
 **To reproduce:**
+
+```bash
+export DEGRADED_DIR="generated_scenes/degraded"
+mkdir -p "$DEGRADED_DIR"
+```
 
 ### 3a. Generate the base scene (seed 42)
 
 ```bash
 $BLENDER --background --python scripts/generate_seeded_dual_sensor_scene.py -- \
     --seed 42 \
-    --output-dir generated_scenes
+    --output-dir "$DEGRADED_DIR"
 ```
 
-This creates `generated_scenes/dual_sensor_scene_42.blend`.
+This creates `$DEGRADED_DIR/dual_sensor_scene_42.blend`.
 
 ### 3b. Run the degraded animated path validation
 
 ```bash
 python3 scripts/run_animated_path_validation.py \
     --blender "$BLENDER" \
-    --base-scene generated_scenes/dual_sensor_scene_42.blend \
+    --base-scene "$DEGRADED_DIR/dual_sensor_scene_42.blend" \
     --config scripts/degraded_animated_path_validation.example.json
 ```
 
-This generates the `straight_push_degraded` animated scene and runs both
-`degraded_gnss_2m` and `degraded_gnss_full_sea_state` trials.
+This generates the animated scene and runs both `degraded_gnss_2m` and
+`degraded_gnss_full_sea_state` trials under `$DEGRADED_DIR/output/`.
 
-Verify TO4:
+Verify TO4 (can also inspect the pre-generated report without re-running):
 
 ```bash
 python3 -c "
 import json
-r = json.load(open('generated_scenes/degraded_animated_paths/output/degraded_animated_trials/straight_push_degraded/degraded_gnss_full_sea_state_multi_sensor_report.json'))
-er = r['error_reduction']
-print('positional_degradation_magnitude_m:', er['positional_degradation_magnitude_m'])  # >= 2.0
-print('post_fusion_rmse:', er['post_fusion_rmse'])                                       # <= 0.15
-print('error_reduction_pct:', er['error_reduction_pct'])                                 # >= 80
-print('meets_80pct_reduction:', er['meets_80pct_reduction'])                             # True
+r = json.load(open('validation/reports/degraded_gnss_full_sea_state_multi_sensor_report.json'))
+to4 = r['technical_objectives']['TO4']
+print('passes_all:', to4['passes_all'])                                              # True
+print('positional_degradation_magnitude_m:', to4['positional_degradation_magnitude_m'])  # >= 2.0
+print('post_fusion_rmse:', to4['post_fusion_rmse'])                                  # <= 0.15
+print('positional_error_reduction_pct:', to4['positional_error_reduction_pct'])      # >= 80
+perf = r['performance']
+print('wall_time_minutes:', perf['wall_time_minutes'])                               # <= 10
+print('peak_memory_gb:', perf['peak_memory_gb'])                                     # <= 8
 "
 ```
 
@@ -196,7 +222,7 @@ python3 scripts/visualize_validation_report.py \
 
 # TO4 proof plots (RMSE comparison, error heatmap)
 python3 scripts/visualize_validation_report.py \
-    generated_scenes/degraded_animated_paths/output/degraded_animated_trials/straight_push_degraded/degraded_gnss_full_sea_state_multi_sensor_report.json
+    validation/reports/degraded_gnss_full_sea_state_multi_sensor_report.json
 ```
 
 ---
@@ -208,8 +234,8 @@ python3 scripts/visualize_validation_report.py \
 | TO1 reproducibility | `tests/test_error_distribution.py` | `pytest tests/test_error_distribution.py` |
 | TO2 noise ranges | `tests/test_degradation.py` | `pytest tests/test_degradation.py` |
 | TO3 KS / bin deviation | `validation/reports/noaa_cb_distribution_validation_report.json` | Section 2 above |
-| TO4 error reduction | `generated_scenes/degraded_animated_paths/.../degraded_gnss_full_sea_state_multi_sensor_report.json` | Section 3 above |
-| TO5 performance | `tests/test_acceptance_thresholds.py::TestTO5Performance` | `pytest tests/test_acceptance_thresholds.py -k TO5` |
+| TO4 error reduction | `validation/reports/degraded_gnss_full_sea_state_multi_sensor_report.json` | Section 3 above |
+| TO5 performance | `validation/reports/degraded_gnss_full_sea_state_multi_sensor_report.json` (performance block) + `tests/test_acceptance_thresholds.py::TestTO5Performance` | `pytest tests/test_acceptance_thresholds.py -k TO5` |
 | D2 NOAA distribution | `validation/reports/noaa_cb_distribution_validation_report.json` | Section 2 above |
 | D4 statistics framework | `tests/test_evaluation_metrics.py` | `pytest tests/test_evaluation_metrics.py` |
 | 6.1 point density | `tests/test_acceptance_thresholds.py::TestPointDensity` | `pytest tests/test_acceptance_thresholds.py -k density` |
