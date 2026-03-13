@@ -1882,7 +1882,24 @@ class WM_OT_GENERATE_POINT_CLOUDS(Operator):
         if properties.measureTime:
             startTime = time.time()
 
-        performScan(context, properties)
+        if (
+            properties.activeScanner == "secondary"
+            and properties.scannerObject2 is not None
+        ):
+            original_scanner_object = properties.scannerObject
+            original_scanner_type = properties.scannerType
+            properties.scannerObject = properties.scannerObject2
+            properties.scannerType = properties.scannerType2
+            try:
+                with generic.TemporaryPropertyOverride(
+                    properties, generic.SWAPPABLE_PROPERTIES, "2"
+                ):
+                    performScan(context, properties)
+            finally:
+                properties.scannerObject = original_scanner_object
+                properties.scannerType = original_scanner_type
+        else:
+            performScan(context, properties)
 
         """
         scan_static(

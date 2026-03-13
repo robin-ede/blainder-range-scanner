@@ -210,8 +210,7 @@ def performScan(
 
     trees = {}
 
-    origin = sensor.matrix_world.translation
-    startLocation = origin.copy()
+    startLocation = sensor.matrix_world.translation.copy()
 
     # set counter of scanned rays to 0
     indexX = 0
@@ -233,7 +232,10 @@ def performScan(
         # setup BVH tree for each object
         trees = generic.getBVHTrees(trees, targets, depsgraph)
 
-        sensorHeight = sensor.matrix_world.translation.z
+        # Update origin each frame so rays emanate from the sensor's current
+        # animated position, not the fixed position at frame 1.
+        origin = sensor.matrix_world.translation
+        sensorHeight = origin.z
 
         firstValueBelowSensor = -1
 

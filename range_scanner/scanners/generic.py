@@ -1,6 +1,7 @@
 import bpy
 import sys
 import bmesh
+from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 import numpy as np
 import traceback
@@ -101,6 +102,22 @@ def getVisibleMeshTargets(context, properties):
                 allTargets.append(obj)
 
     return allTargets
+
+
+def filterSideScanTargets(targets, surface_height):
+    if surface_height is None:
+        return list(targets)
+
+    filtered_targets = []
+    for target in targets:
+        world_corners = [
+            target.matrix_world @ Vector(corner) for corner in target.bound_box
+        ]
+        min_corner_z = min(corner.z for corner in world_corners)
+        if min_corner_z < float(surface_height):
+            filtered_targets.append(target)
+
+    return filtered_targets
 
 
 def validateWaterProfile(context, properties, suffix=""):
@@ -216,6 +233,20 @@ def normalizeOutputPath(base_path, output_path):
     return output_path
 
 
+def ensureOutputSettings(properties, default_name):
+    base_path = os.path.dirname(bpy.data.filepath) if bpy.data.filepath else os.getcwd()
+
+    if not properties.dataFileName:
+        properties.dataFileName = default_name
+
+    if not properties.dataFilePath:
+        properties.dataFilePath = os.path.join(base_path, "output", default_name)
+    else:
+        properties.dataFilePath = normalizeOutputPath(
+            base_path, properties.dataFilePath
+        )
+
+
 def getMultiSensorWaterSurfaceHeight(properties):
     if properties.scannerType == ScannerType.sideScan.name:
         return float(properties.surfaceHeight)
@@ -271,9 +302,6 @@ def filterHitsBySensorMedium(
         is_valid = True
         if sensor_type == ScannerType.sideScan.name:
             is_valid = hit_medium == "below_water"
-        elif sensor_type in (ScannerType.static.name, ScannerType.rotating.name):
-            is_valid = hit_medium == "above_water"
-
         if is_valid:
             kept_hits.append(hit)
             kept_by_medium[hit_medium] += 1
@@ -494,6 +522,14 @@ def startScan(context, properties, objectName):
         cleanedFileName = removeInvalidCharatersFromFileName(
             "%s_%s" % (properties.dataFileName, objectName)
         )
+
+    default_output_source = objectName
+    if default_output_source is None and properties.scannerObject is not None:
+        default_output_source = properties.scannerObject.name
+    default_output_name = cleanedFileName or removeInvalidCharatersFromFileName(
+        default_output_source or "scan"
+    )
+    ensureOutputSettings(properties, default_output_name)
 
     if not cleanedFileName == properties.dataFileName:
         print(
@@ -722,7 +758,7 @@ def startScan(context, properties, objectName):
         for frameNumber in frameRange:
             print("Rendering frame %d..." % frameNumber)
 
-            trees = generic.getBVHTrees(trees, targets, depsgraph)
+            trees = getBVHTrees(trees, targets, depsgraph)
 
             halfFOV = properties.fovX / 2.0
 
@@ -902,6 +938,11 @@ def performMultiSensorScan(context, properties):
         for error in validation_result["errors"]:
             print("ERROR:", error)
         return {"CANCELLED"}
+
+    default_output_name = removeInvalidCharatersFromFileName(
+        properties.dataFileName or "multi_sensor_scan"
+    )
+    ensureOutputSettings(properties, default_output_name)
 
     report_warnings = list(validation_result["warnings"])
 
@@ -2030,6 +2071,8 @@ def runSonarScan(context, properties, targets, materialMappings, categoryIDs, pa
     if properties.scannerObject.matrix_world.translation.z > properties.surfaceHeight:
         print("WARNING: Sonar sensor is above water level!")
         return []
+
+    targets = filterSideScanTargets(targets, properties.surfaceHeight)
 
     # Prepare water profile depth list
     if properties.simulateWaterProfile:
