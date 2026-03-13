@@ -90,5 +90,5 @@ Current canonical templates:
 ## Notes
 
 - Generated outputs belong under ignored output folders like `generated_scenes/`.
-- `extract_kongsberg_all_points.py` expects a local clone of the real GitHub
-  `pyall` reader under `external/pyall-github/`, which is ignored by git.
+- `extract_kongsberg_all_points.py` expects a local clone of the
+  [`pyall`](https://github.com/guardiangeomatics/pyall) reader under `external/pyall-github/`, which is ignored by git.

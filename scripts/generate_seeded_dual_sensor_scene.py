@@ -6,9 +6,16 @@ import math
 import os
 import random
 import sys
+from pathlib import Path
 
 import bpy
 from mathutils import Vector
+
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from scan_ready_blend_utils import apply_scan_ready_config, build_dual_sensor_config
 
 
 def parse_args(argv):
@@ -170,8 +177,23 @@ def generate_scene(seed_value):
         generated_names.append(obj.name)
 
     target = Vector((3.5, 0.0, -0.8))
-    add_camera("Camera", Vector((-12.0, 0.0, 6.5)), target, lens=20.0)
-    add_camera("Camera.001", Vector((-8.0, 0.0, -2.4)), target, lens=22.0)
+    primary_camera = add_camera("Camera", Vector((-12.0, 0.0, 6.5)), target, lens=20.0)
+    secondary_camera = add_camera(
+        "Camera.001", Vector((-8.0, 0.0, -2.4)), target, lens=22.0
+    )
+
+    apply_scan_ready_config(
+        bpy.context.scene,
+        build_dual_sensor_config(
+            primary_object_name=primary_camera.name,
+            secondary_object_name=secondary_camera.name,
+            frame_end=1,
+            frame_rate=10.0,
+            surface_height=0.0,
+            enable_animation=False,
+            add_noise=True,
+        ),
+    )
 
     bpy.context.scene.frame_set(1)
 

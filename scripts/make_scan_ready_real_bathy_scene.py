@@ -5,6 +5,12 @@ from pathlib import Path
 import bpy
 from mathutils import Vector
 
+SCRIPT_DIR = Path(__file__).resolve().parent
+if str(SCRIPT_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_DIR))
+
+from scan_ready_blend_utils import apply_scan_ready_config, build_dual_sensor_config
+
 
 def look_at(obj, target):
     direction = target - obj.location
@@ -77,8 +83,16 @@ def main() -> None:
     look_at(cam_primary, look_target)
 
     # Secondary below-water camera placeholder for sonar scanner.
-    secondary_z = min(-1.0, seabed_top + 2.0)
-    secondary_z = max(secondary_z, seabed_bottom + 0.75)
+    water_surface_z = float(water.location.z)
+    lower_bound = max(seabed_top + 0.25, seabed_bottom + 0.75)
+    upper_bound = water_surface_z - 0.25
+    if lower_bound > upper_bound:
+        raise RuntimeError(
+            "Seabed reaches too close to the water surface for a safe sonar camera placement. "
+            "Raise the water surface or use a deeper crop."
+        )
+    secondary_z = min(-1.0, upper_bound)
+    secondary_z = max(secondary_z, lower_bound)
     bpy.ops.object.camera_add(
         location=(center_x - sensor_standoff, center_y, secondary_z)
     )
@@ -89,6 +103,19 @@ def main() -> None:
     bpy.context.scene.frame_start = 1
     bpy.context.scene.frame_end = 1
     bpy.context.scene.camera = cam_primary
+
+    apply_scan_ready_config(
+        bpy.context.scene,
+        build_dual_sensor_config(
+            primary_object_name=cam_primary.name,
+            secondary_object_name=cam_secondary.name,
+            frame_end=1,
+            frame_rate=10.0,
+            surface_height=float(water.location.z),
+            enable_animation=False,
+            add_noise=True,
+        ),
+    )
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
