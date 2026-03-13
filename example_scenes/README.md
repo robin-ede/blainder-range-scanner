@@ -1,7 +1,9 @@
 # Example Scenes
 
 Open any of these `.blend` files directly in Blender 5.0+ to inspect the scene
-and run scans interactively via the BLAINDER panel.
+and run scans interactively via the BLAINDER panel. The committed scenes are
+pre-configured with scanner objects and sensor settings, so you can scan
+immediately without manually wiring cameras first.
 
 | File | Description | Used to prove |
 |---|---|---|
@@ -13,8 +15,9 @@ and run scans interactively via the BLAINDER panel.
 
 1. Open a scene in Blender.
 2. Open the **BLAINDER** side panel (press `N` in the 3D viewport).
-3. Configure scanner parameters or load a preset.
-4. Press **Start Scan**.
+3. Press **Scan Both Sensors** for the dual-sensor scenes, or **Start Scan** if
+   you want to run only the currently active sensor.
+4. Adjust settings only if you want something different from the baked defaults.
 
 ## Running the full validation pipeline
 
